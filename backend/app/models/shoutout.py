@@ -12,7 +12,9 @@ class ShoutOut(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    sender = relationship("User", back_populates="sent_shoutouts", foreign_keys=[sender_id])
+    # 👇 Must match the exact name in User model
+    sender = relationship("User", back_populates="shoutouts_sent", foreign_keys=[sender_id])
+
     recipients = relationship("ShoutOutRecipient", back_populates="shoutout", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="shoutout", cascade="all, delete-orphan")
     reactions = relationship("Reaction", back_populates="shoutout", cascade="all, delete-orphan")
@@ -27,4 +29,4 @@ class ShoutOutRecipient(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     shoutout = relationship("ShoutOut", back_populates="recipients")
-    recipient = relationship("User", back_populates="received_shoutouts")
+    recipient = relationship("User", back_populates="shoutouts_received")

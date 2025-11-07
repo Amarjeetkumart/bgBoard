@@ -11,15 +11,14 @@ class UserCreate(UserBase):
     password: str
     role: str = "employee"
 
-
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     department: Optional[str] = None
 
 class User(UserBase):
     id: int
-    role: str
-    joined_at: datetime
+    role: Optional[str] = None
+    joined_at: Optional[datetime] = None  # ✅ Make it optional to avoid ResponseValidationError
     is_active: bool
 
     class Config:

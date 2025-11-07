@@ -33,6 +33,15 @@ async def update_current_user(
     db.refresh(current_user)
     return current_user
 
+@router.get("/search", response_model=List[UserSchema])
+async def search_users(
+    query: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    users = db.query(User).filter(User.name.ilike(f"%{query}%")).all()
+    return users
+
 @router.get("", response_model=List[UserSchema])
 async def get_users(
     department: str = None,

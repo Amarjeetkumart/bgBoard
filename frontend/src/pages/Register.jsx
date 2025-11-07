@@ -38,7 +38,7 @@ export default function Register() {
       <div className="absolute top-6 left-6 flex items-center space-x-2">
         <Link 
           to="/register" 
-          className="text-blue-800 font-bold text-lg "
+          className="text-blue-600 font-bold text-3xl "
         >
           Brag Board
         </Link>

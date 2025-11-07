@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { shoutoutAPI, userAPI, commentAPI, reactionAPI } from '../services/api';
+import { shoutoutAPI, commentAPI, reactionAPI } from '../services/api';
 import CreateShoutout from '../components/shoutouts/CreateShoutout';
 import ShoutoutCard from '../components/shoutouts/ShoutoutCard';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 
 export default function Feed() {
   const [shoutouts, setShoutouts] = useState([]);
@@ -49,9 +50,10 @@ export default function Feed() {
     }
   };
 
-  const handleComment = async (shoutoutId, content) => {
+  // Align signature with ShoutoutCard: second arg is a payload { content, mentions }
+  const handleComment = async (shoutoutId, payload) => {
     try {
-      await commentAPI.create(shoutoutId, { content });
+      await commentAPI.create(shoutoutId, payload);
       fetchShoutouts();
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -88,15 +90,17 @@ export default function Feed() {
           </div>
         ) : (
           <div className="space-y-4">
-            {shoutouts.map((shoutout) => (
-              <ShoutoutCard
-                key={shoutout.id}
-                shoutout={shoutout}
-                onReaction={handleReaction}
-                onComment={handleComment}
-                onRefresh={fetchShoutouts}
-              />
-            ))}
+            <ErrorBoundary>
+              {shoutouts.map((shoutout) => (
+                <ShoutoutCard
+                  key={shoutout.id}
+                  shoutout={shoutout}
+                  onReaction={handleReaction}
+                  onComment={handleComment}
+                  onRefresh={fetchShoutouts}
+                />
+              ))}
+            </ErrorBoundary>
           </div>
         )}
 

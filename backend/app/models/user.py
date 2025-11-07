@@ -1,22 +1,33 @@
-from sqlalchemy import Boolean, Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+from app.models.shoutout import ShoutOut
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    password = Column(String(255), nullable=False)
-    department = Column(String(100))
-    role = Column(String(20), default="employee")
-    joined_at = Column(DateTime(timezone=True), server_default=func.now())
+    email = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    department = Column(String)
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    role = Column(String, default="employee", nullable=False)  # ✅ make not nullable + default
 
-    sent_shoutouts = relationship("ShoutOut", back_populates="sender", foreign_keys="ShoutOut.sender_id")
-    received_shoutouts = relationship("ShoutOutRecipient", back_populates="recipient")
+    # 👇 Make sure this matches ShoutOut.sender's back_populates
+    shoutouts_sent = relationship("ShoutOut", back_populates="sender", foreign_keys=[ShoutOut.sender_id])
+
+    shoutouts_received = relationship(
+        "ShoutOutRecipient",
+        back_populates="recipient",
+        cascade="all, delete-orphan"
+    )
+
     comments = relationship("Comment", back_populates="user")
     reactions = relationship("Reaction", back_populates="user")
-    reports = relationship("Report", back_populates="reporter")
+    comment_mentions = relationship("Comment", secondary="comment_mentions", back_populates="mentions")
+    reports = relationship("Report", back_populates="reporter", cascade="all, delete-orphan")
