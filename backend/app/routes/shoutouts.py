@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy import func
-from typing import List
+from typing import List, Optional
 from app.database import get_db
 from app.models.user import User
 from app.models.shoutout import ShoutOut, ShoutOutRecipient
@@ -100,22 +100,42 @@ async def create_shoutout(
 async def get_shoutouts(
     skip: int = 0,
     limit: int = 20,
+    department: Optional[str] = None,
+    sender_id: Optional[int] = None,
+    start_date: Optional[str] = None,  # YYYY-MM-DD
+    end_date: Optional[str] = None,    # YYYY-MM-DD
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
+    # Base query: restrict to the current user's department by recipient membership
     shoutouts_query = (
         db.query(ShoutOut)
         .join(ShoutOutRecipient, ShoutOut.id == ShoutOutRecipient.shoutout_id)
         .join(User, ShoutOutRecipient.recipient_id == User.id)
         .filter(User.department == current_user.department)
         .distinct()
-        .order_by(ShoutOut.created_at.desc())
-        .offset(skip)
-        .limit(limit)
     )
-    
+
+    # Optional filters
+    if department:
+        # filter by sender department; due to business rules, sender and recipients share dept
+        sender_user = aliased(User)
+        shoutouts_query = shoutouts_query.join(
+            sender_user, ShoutOut.sender_id == sender_user.id
+        ).filter(sender_user.department == department)
+
+    if sender_id:
+        shoutouts_query = shoutouts_query.filter(ShoutOut.sender_id == sender_id)
+
+    if start_date:
+        # Compare by date portion to avoid TZ issues
+        shoutouts_query = shoutouts_query.filter(func.date(ShoutOut.created_at) >= start_date)
+    if end_date:
+        shoutouts_query = shoutouts_query.filter(func.date(ShoutOut.created_at) <= end_date)
+
+    shoutouts_query = shoutouts_query.order_by(ShoutOut.created_at.desc()).offset(skip).limit(limit)
+
     shoutouts = shoutouts_query.all()
-    
     return [format_shoutout(s, current_user.id, db) for s in shoutouts]
 
 @router.get("/{shoutout_id}", response_model=ShoutOutSchema)

@@ -99,16 +99,16 @@ export default function CommentInput({ value = '', onChange = () => {}, onAddCom
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder="Write a comment... Use @ to tag"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400"
           rows={1}
         />
         {showSuggestions && suggestions.length > 0 && (
-          <ul className="absolute mt-1 w-full max-w-sm bg-white border border-gray-200 rounded-md shadow z-50 text-sm">
+          <ul className="absolute mt-1 w-full max-w-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow z-50 text-sm">
             {suggestions.map((s, idx) => (
               <li
                 key={s.id}
                 onMouseDown={(e) => { e.preventDefault(); insertMention(s); }}
-                className={`px-3 py-2 cursor-pointer ${idx === activeIndex ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}
+                className={`px-3 py-2 cursor-pointer ${idx === activeIndex ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'hover:bg-gray-50 dark:hover:bg-gray-800'} text-gray-900 dark:text-gray-100`}
               >@{s.name}</li>
             ))}
           </ul>

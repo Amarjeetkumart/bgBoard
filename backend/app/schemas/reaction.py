@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Dict, List, Optional
 
 class ReactionCreate(BaseModel):
     type: str
@@ -13,3 +14,16 @@ class Reaction(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ReactionUser(BaseModel):
+    id: int
+    name: str
+    email: str
+    department: Optional[str] = None
+
+
+class ReactionSummary(BaseModel):
+    shoutout_id: int
+    counts: Dict[str, int]
+    users: Dict[str, List[ReactionUser]]

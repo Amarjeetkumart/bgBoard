@@ -77,6 +77,8 @@ export const commentAPI = {
 export const reactionAPI = {
   add: (shoutoutId, type) => api.post(`/shoutouts/${shoutoutId}/reactions`, { type }),
   remove: (shoutoutId, type) => api.delete(`/shoutouts/${shoutoutId}/reactions/${type}`),
+  listUsers: (shoutoutId, type) => api.get(`/shoutouts/${shoutoutId}/reactions`, { params: { reaction_type: type } }),
+  listAllUsers: (shoutoutId) => api.get(`/shoutouts/${shoutoutId}/reactions`),
 };
 
 export const adminAPI = {
