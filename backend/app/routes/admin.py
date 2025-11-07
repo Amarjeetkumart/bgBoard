@@ -8,9 +8,18 @@ from app.models.shoutout import ShoutOut, ShoutOutRecipient
 from app.models.report import Report
 from app.models.admin_log import AdminLog
 from app.schemas.report import Report as ReportSchema, ReportCreate
+from app.schemas.user import User as UserSchema
 from app.middleware.auth import get_current_active_user, require_admin
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+@router.get("/users", response_model=List[UserSchema])
+async def get_all_users(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    users = db.query(User).all()
+    return users
 
 @router.get("/analytics")
 async def get_analytics(

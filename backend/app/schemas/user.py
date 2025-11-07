@@ -9,6 +9,8 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    role: str = "employee"
+
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None

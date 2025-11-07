@@ -24,7 +24,7 @@ app.include_router(admin.router)
 
 @app.get("/")
 async def root():
-    return {"message": "Employee Recognition Platform API"}
+    return {"message": "BragBoard"}
 
 @app.get("/health")
 async def health():

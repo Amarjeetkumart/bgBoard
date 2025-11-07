@@ -31,13 +31,16 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
     
+    if user_data.role not in ["admin", "employee"]:
+        raise HTTPException(status_code=400, detail="Invalid role specified. Use 'admin' or 'employee'.")
+
     hashed_password = get_password_hash(user_data.password)
     new_user = User(
         name=user_data.name,
         email=user_data.email,
         password=hashed_password,
         department=user_data.department,
-        role="employee"
+        role=user_data.role
     )
     
     db.add(new_user)

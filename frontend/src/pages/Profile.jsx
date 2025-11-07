@@ -27,9 +27,9 @@ export default function Profile() {
     try {
       const response = await userAPI.updateMe({ name, department });
       setUser(response.data);
-      setSuccess('Profile updated successfully!');
+      // setSuccess('Profile updated successfully!');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to update profile');
+      // setError(err.response?.data?.detail || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,7 @@ export default function Profile() {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
               />
             </div>
-            <div>
+            {/* <div>
               <label className="block text-sm font-medium text-gray-700">Department</label>
               <select
                 required
@@ -89,7 +89,7 @@ export default function Profile() {
                 <option value="Finance">Finance</option>
                 <option value="Operations">Operations</option>
               </select>
-            </div>
+            </div> */}
             <div>
               <button
                 type="submit"
