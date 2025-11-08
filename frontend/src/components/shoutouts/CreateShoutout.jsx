@@ -66,7 +66,7 @@ export default function CreateShoutout({ onClose, onCreate }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg max-w-2xl w-full p-6">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg w-full max-w-xl md:max-w-2xl p-4 md:p-6 max-h-[85vh] overflow-y-auto">
         <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Create Shout-Out</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -87,7 +87,7 @@ export default function CreateShoutout({ onClose, onCreate }) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Recipients ({selectedRecipients.length} selected)
             </label>
-            <div className="border border-gray-300 dark:border-gray-700 rounded-md max-h-60 overflow-y-auto p-3 space-y-2 bg-white dark:bg-gray-800">
+            <div className="border border-gray-300 dark:border-gray-700 rounded-md max-h-56 md:max-h-60 overflow-y-auto p-3 space-y-2 bg-white dark:bg-gray-800">
               {recipients.map((recipient) => (
                 <label key={recipient.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded text-gray-900 dark:text-gray-100">
                   <input
@@ -141,7 +141,7 @@ export default function CreateShoutout({ onClose, onCreate }) {
             )}
           </div>
 
-          <div className="flex justify-end space-x-3">
+          <div className="sticky bottom-0 pt-4 mt-6 bg-white dark:bg-gray-900 flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
