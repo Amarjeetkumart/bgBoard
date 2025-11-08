@@ -1,3 +1,10 @@
+/* Smooth theme transitions across major containers */
+.theme-transition,
+nav,
+.card,
+.page-container {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+}
 #root {
   max-width: 1280px;
   margin: 0 auto;

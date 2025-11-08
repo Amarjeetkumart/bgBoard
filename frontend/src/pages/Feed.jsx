@@ -103,8 +103,8 @@ export default function Feed() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <div className="max-w-2xl mx-auto py-8 px-4">
+  <div className="min-h-screen bg-gray-50 dark:bg-gray-950 theme-transition" key={(document?.documentElement?.classList.contains('dark') ? 'dark' : 'light')}>
+      <div className="max-w-2xl mx-auto py-8 px-4 page-container">
         <div className="mb-4 flex flex-col gap-4">
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{user?.department} Feed</h1>

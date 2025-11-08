@@ -70,7 +70,7 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow p-6">
+  <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow p-6 card">
       <div className="flex items-start space-x-3 mb-4">
         <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
           {(shoutout.sender?.name?.charAt(0)?.toUpperCase()) || '?'}
