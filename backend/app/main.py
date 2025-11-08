@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from app.routes import auth, users, shoutouts, comments, reactions, admin
@@ -21,6 +23,11 @@ app.include_router(shoutouts.router)
 app.include_router(comments.router)
 app.include_router(reactions.router)
 app.include_router(admin.router)
+
+# Static file serving for uploaded attachments
+uploads_dir = os.path.join(os.getcwd(), 'uploads')
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 @app.get("/")
 async def root():

@@ -1,13 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy import func
 from typing import List, Optional
 from app.database import get_db
 from app.models.user import User
-from app.models.shoutout import ShoutOut, ShoutOutRecipient
+from app.models.shoutout import ShoutOut, ShoutOutRecipient, ShoutOutAttachment
 from app.models.reaction import Reaction
 from app.models.comment import Comment
 from app.schemas.shoutout import ShoutOut as ShoutOutSchema, ShoutOutCreate, ShoutOutUpdate
+import os, secrets, shutil
 from app.middleware.auth import get_current_active_user
 
 router = APIRouter(prefix="/api/shoutouts", tags=["shoutouts"])
@@ -28,6 +29,17 @@ def format_shoutout(shoutout, user_id, db):
     
     comment_count = db.query(func.count(Comment.id)).filter(Comment.shoutout_id == shoutout.id).scalar()
     
+    # Collect attachments from relationship
+    attachment_objs = []
+    if getattr(shoutout, 'attachments', None):
+        for a in shoutout.attachments:
+            attachment_objs.append({
+                "url": a.url,
+                "name": a.name,
+                "type": a.type,
+                "size": a.size,
+            })
+
     return {
         "id": shoutout.id,
         "sender_id": shoutout.sender_id,
@@ -51,49 +63,74 @@ def format_shoutout(shoutout, user_id, db):
         ],
         "reaction_counts": {reaction_type: count for reaction_type, count in reaction_counts},
         "comment_count": comment_count,
-        "user_reactions": [r[0] for r in user_reactions]
+        "user_reactions": [r[0] for r in user_reactions],
+        "attachments": attachment_objs
     }
 
 @router.post("", response_model=ShoutOutSchema)
 async def create_shoutout(
-    shoutout_data: ShoutOutCreate,
+    request: Request,
+    message: str = Form(...),
+    recipient_ids: List[int] = Form(...),
+    files: List[UploadFile] = File(None),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
+    # Validate message
+    if not message.strip():
+        raise HTTPException(status_code=400, detail="Shoutout message cannot be empty")
+
     new_shoutout = ShoutOut(
         sender_id=current_user.id,
-        message=shoutout_data.message
+        message=message,
     )
-    
     db.add(new_shoutout)
     db.flush()
-    
-    for recipient_id in shoutout_data.recipient_ids:
+
+    # Validate recipients
+    for recipient_id in recipient_ids:
         recipient = db.query(User).filter(User.id == recipient_id).first()
         if not recipient:
             raise HTTPException(status_code=404, detail=f"Recipient with id {recipient_id} not found")
-
         if recipient.id == current_user.id:
-            raise HTTPException(
-                status_code=400,
-                detail="You cannot give a shoutout to yourself"
-            )
-        
+            raise HTTPException(status_code=400, detail="You cannot give a shoutout to yourself")
         if recipient.department != current_user.department:
-            raise HTTPException(
-                status_code=403, 
-                detail="Can only tag users from your own department"
-            )
-        
-        shoutout_recipient = ShoutOutRecipient(
-            shoutout_id=new_shoutout.id,
-            recipient_id=recipient_id
-        )
+            raise HTTPException(status_code=403, detail="Can only tag users from your own department")
+        shoutout_recipient = ShoutOutRecipient(shoutout_id=new_shoutout.id, recipient_id=recipient_id)
         db.add(shoutout_recipient)
-    
+
+    # Handle file uploads (optional)
+    saved_files = []
+    if files:
+        upload_root = os.path.join(os.getcwd(), 'uploads', 'shoutouts')
+        os.makedirs(upload_root, exist_ok=True)
+        MAX_SIZE = 5 * 1024 * 1024  # 5MB
+        allowed_ext = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf'}
+        for file in files:
+            original_name = file.filename
+            _, ext = os.path.splitext(original_name.lower())
+            if ext not in allowed_ext:
+                raise HTTPException(status_code=400, detail=f"File type {ext} not allowed")
+            # Read content to enforce size limit
+            contents = await file.read()
+            size = len(contents)
+            if size > MAX_SIZE:
+                raise HTTPException(status_code=400, detail=f"File {original_name} exceeds 5MB size limit")
+            file.file.seek(0)  # reset pointer for saving via shutil if needed
+            safe_name = f"{secrets.token_hex(8)}_{original_name}"
+            dest_path = os.path.join(upload_root, safe_name)
+            with open(dest_path, 'wb') as out_file:
+                out_file.write(contents)
+            url = f"/uploads/shoutouts/{safe_name}"
+            mime = None
+            if ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']:
+                mime = f"image/{ext.replace('.', '') if ext != '.jpg' else 'jpeg'}"
+            saved_files.append({"url": url, "name": original_name, "type": mime, "size": size})
+        for f in saved_files:
+            db.add(ShoutOutAttachment(shoutout_id=new_shoutout.id, url=f["url"], name=f["name"], type=f.get("type"), size=f.get("size")))
+
     db.commit()
     db.refresh(new_shoutout)
-    
     return format_shoutout(new_shoutout, current_user.id, db)
 
 @router.get("", response_model=List[ShoutOutSchema])

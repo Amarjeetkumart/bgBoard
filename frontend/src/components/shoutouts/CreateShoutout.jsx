@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { userAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -7,6 +7,8 @@ export default function CreateShoutout({ onClose, onCreate }) {
   const [recipients, setRecipients] = useState([]);
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [files, setFiles] = useState([]);
+  const fileInputRef = useRef(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -26,15 +28,32 @@ export default function CreateShoutout({ onClose, onCreate }) {
     e.preventDefault();
     setLoading(true);
     try {
-      await onCreate({
-        message,
-        recipient_ids: selectedRecipients,
-      });
+      const form = new FormData();
+      form.append('message', message);
+      // Backend expects a list for recipient_ids via Form. Axios will send repeated keys for arrays
+      selectedRecipients.forEach((id) => form.append('recipient_ids', id));
+      files.forEach((f) => form.append('files', f));
+      await onCreate(form);
     } catch (error) {
       console.error('Error creating shoutout:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFileClick = () => fileInputRef.current?.click();
+  const handleFilesSelected = (e) => {
+    const selected = Array.from(e.target.files || []);
+    // Basic front-end validation: types and size <= 5MB
+    const allowed = ['image/png','image/jpeg','image/jpg','image/gif','image/webp','application/pdf'];
+    const filtered = selected.filter(f => allowed.includes(f.type) && f.size <= 5 * 1024 * 1024);
+    setFiles(prev => [...prev, ...filtered]);
+    // reset input so selecting the same file again triggers change
+    e.target.value = '';
+  };
+
+  const removeFile = (idx) => {
+    setFiles(prev => prev.filter((_, i) => i !== idx));
   };
 
   const toggleRecipient = (userId) => {
@@ -81,6 +100,45 @@ export default function CreateShoutout({ onClose, onCreate }) {
                 </label>
               ))}
             </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Attachments (optional)
+            </label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleFileClick}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
+                title="Add attachments"
+              >
+                <span>📎</span>
+                <span>Add files</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={handleFilesSelected}
+              />
+            </div>
+            {files.length > 0 && (
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                {files.map((f, idx) => (
+                  <div key={idx} className="relative border rounded p-2 bg-gray-50 dark:bg-gray-800">
+                    {f.type.startsWith('image/') ? (
+                      <img src={URL.createObjectURL(f)} alt={f.name} className="w-full h-24 object-cover rounded" />
+                    ) : (
+                      <div className="h-24 flex items-center justify-center text-sm text-gray-600 dark:text-gray-300">PDF: {f.name}</div>
+                    )}
+                    <button type="button" onClick={() => removeFile(idx)} className="absolute top-1 right-1 text-xs bg-red-500 text-white rounded px-1">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end space-x-3">
