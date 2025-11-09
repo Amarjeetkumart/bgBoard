@@ -45,12 +45,20 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     const response = await authAPI.register(userData);
-    const { access_token, refresh_token } = response.data;
-    localStorage.setItem('access_token', access_token);
-    localStorage.setItem('refresh_token', refresh_token);
-    const userResponse = await userAPI.getMe();
-    setUser(userResponse.data);
-    return userResponse.data;
+    if (response.data?.requires_verification) {
+      // Do not log in yet; wait for email verification
+      return response.data;
+    }
+    // Fallback to legacy behavior if backend still returns tokens
+    const { access_token, refresh_token } = response.data || {};
+    if (access_token && refresh_token) {
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      const userResponse = await userAPI.getMe();
+      setUser(userResponse.data);
+      return userResponse.data;
+    }
+    return response.data;
   };
 
   const logout = () => {

@@ -11,6 +11,7 @@ export default function Register() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -20,8 +21,14 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await register(formData);
-      navigate('/');
+      const res = await register(formData);
+      if (res?.requires_verification) {
+        setSuccess(res?.message || 'Registration successful. Please check your email to verify your account.');
+        // Optionally redirect to login after a short delay
+        // setTimeout(() => navigate('/login'), 3000);
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed');
     } finally {
@@ -51,6 +58,11 @@ export default function Register() {
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {success && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+              {success}
+            </div>
+          )}
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}

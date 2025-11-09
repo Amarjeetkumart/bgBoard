@@ -92,6 +92,11 @@ export default function Login() {
               <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
                 Don't have an account? Sign up
               </Link>
+              <div className="mt-2">
+                <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
+                  Forgot your password?
+                </Link>
+              </div>
             </div>
           </form>
         </div>
