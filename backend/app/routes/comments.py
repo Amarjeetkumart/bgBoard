@@ -99,7 +99,8 @@ async def delete_comment(
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
     
-    if comment.user_id != current_user.id and current_user.role != "admin":
+    # Allow legacy admins with is_admin True
+    if comment.user_id != current_user.id and not (current_user.role == "admin" or getattr(current_user, "is_admin", False)):
         raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
     
     db.delete(comment)

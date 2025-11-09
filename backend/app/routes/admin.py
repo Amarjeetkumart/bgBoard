@@ -7,7 +7,7 @@ from app.models.user import User
 from app.models.shoutout import ShoutOut, ShoutOutRecipient
 from app.models.report import Report
 from app.models.admin_log import AdminLog
-from app.schemas.report import Report as ReportSchema, ReportCreate
+from app.schemas.report import Report as ReportSchema, ReportCreate, ReportResolve
 from app.schemas.user import User as UserSchema
 from app.middleware.auth import get_current_active_user, require_admin
 
@@ -115,19 +115,23 @@ async def get_reports(
 @router.post("/reports/{report_id}/resolve")
 async def resolve_report(
     report_id: int,
-    action: str,
+    payload: ReportResolve,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
+    """Resolve a report by approving (keeping) or rejecting (dismissing) it.
+    Body: {"action": "approved" | "rejected"}
+    """
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
+    action = payload.action
     if action not in ["approved", "rejected"]:
         raise HTTPException(status_code=400, detail="Invalid action")
-    
+
     report.status = action
-    
+
     admin_log = AdminLog(
         admin_id=admin.id,
         action=f"Resolved report #{report_id} with action: {action}",
@@ -135,9 +139,9 @@ async def resolve_report(
         target_type="report"
     )
     db.add(admin_log)
-    
+
     db.commit()
-    
+
     return {"message": f"Report {action} successfully"}
 
 @router.delete("/shoutouts/{shoutout_id}")

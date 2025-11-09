@@ -94,4 +94,5 @@ export const adminAPI = {
   deleteShoutout: (id) => api.delete(`/admin/shoutouts/${id}`),
   getLeaderboard: () => api.get('/admin/leaderboard'),
   reportShoutout: (shoutoutId, reason) => api.post(`/admin/shoutouts/${shoutoutId}/report`, { reason }),
+  deleteComment: (commentId) => api.delete(`/shoutouts/comments/${commentId}`),
 };

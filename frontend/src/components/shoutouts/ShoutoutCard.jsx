@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { commentAPI, reactionAPI } from '../../services/api';
+import { commentAPI, reactionAPI, adminAPI } from '../../services/api';
 import CommentInput from './CommentInput';
 
 export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefresh }) {
@@ -7,6 +7,7 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [reactorPanel, setReactorPanel] = useState({ open: false, type: null, loading: false, users: [] });
+  const [reportModal, setReportModal] = useState({ open: false, reason: '', submitting: false, submitted: false, error: '' });
   // no local loading state required for now
 
   const loadComments = async () => {
@@ -136,6 +137,13 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
           <span>💬</span>
           <span>{shoutout.comment_count ?? 0}</span>
         </button>
+        <button
+          onClick={() => setReportModal({ open: true, reason: '', submitting: false, submitted: false, error: '' })}
+          className="ml-auto text-sm text-red-600 hover:text-red-700"
+          title="Report this shout-out"
+        >
+          Report
+        </button>
       </div>
 
       {reactorPanel.open && (
@@ -191,6 +199,31 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
           />
         </div>
       )}
+
+      {reportModal.open && (
+        <ReportModal
+          reason={reportModal.reason}
+          submitting={reportModal.submitting}
+          submitted={reportModal.submitted}
+          error={reportModal.error}
+          onChange={(v) => setReportModal((s) => ({ ...s, reason: v }))}
+          onClose={() => setReportModal({ open: false, reason: '', submitting: false, submitted: false, error: '' })}
+          onSubmit={async () => {
+            if (!reportModal.reason.trim()) {
+              setReportModal((s) => ({ ...s, error: 'Please provide a reason.' }));
+              return;
+            }
+            try {
+              setReportModal((s) => ({ ...s, submitting: true, error: '' }));
+              await adminAPI.reportShoutout(shoutout.id, reportModal.reason.trim());
+              setReportModal((s) => ({ ...s, submitting: false, submitted: true }));
+            } catch (e) {
+              const msg = e?.response?.data?.detail || 'Failed to submit report';
+              setReportModal((s) => ({ ...s, submitting: false, error: msg }));
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -233,5 +266,44 @@ function AttachmentPreview({ attachment }) {
         </div>
       )}
     </a>
+  );
+}
+
+function ReportModal({ reason, submitting, submitted, error, onChange, onClose, onSubmit }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Report Shout-Out</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+        </div>
+        {submitted ? (
+          <div className="space-y-4">
+            <p className="text-green-700 bg-green-50 border border-green-200 rounded p-3">Report submitted. Thank you.</p>
+            <div className="text-right">
+              <button onClick={onClose} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Close</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reason</label>
+            <textarea
+              rows={4}
+              value={reason}
+              onChange={(e) => onChange(e.target.value)}
+              className="w-full border border-gray-300 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+              placeholder="Describe what's inappropriate or needs review"
+            />
+            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+            <div className="mt-4 flex justify-end space-x-2">
+              <button onClick={onClose} className="px-4 py-2 border rounded text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700">Cancel</button>
+              <button onClick={onSubmit} disabled={submitting} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50">
+                {submitting ? 'Submitting…' : 'Submit Report'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

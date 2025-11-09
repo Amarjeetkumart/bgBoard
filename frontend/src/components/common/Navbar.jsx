@@ -115,14 +115,8 @@ export default function Navbar() {
             >
               System
             </button>
-            <Link to="/" className="text-gray-700 hover:text-blue-600 text-lg dark:text-gray-200 dark:hover:text-blue-400">
-              Home
-            </Link>
-            {user?.role === 'admin' && (
-              <Link to="/admin" className="text-gray-700 hover:text-blue-600 text-lg dark:text-gray-200 dark:hover:text-blue-400">
-                Admin
-              </Link>
-            )}
+            
+            
             <div className="flex items-center space-x-2">
               <Link to="/profile" className="text-gray-700 hover:text-blue-600 text-lg dark:text-gray-200 dark:hover:text-blue-400">
                 {user?.name}

@@ -47,7 +47,8 @@ async def get_current_active_user(
 async def require_admin(
     current_user: User = Depends(get_current_active_user)
 ) -> User:
-    if current_user.role != "admin":
+    # Accept either role flag or legacy is_admin boolean
+    if current_user.role != "admin" and not getattr(current_user, "is_admin", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"

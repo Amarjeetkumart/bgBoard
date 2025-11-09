@@ -34,7 +34,7 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <Routes>
-                <Route path="/" element={<Feed />} />
+                <Route path="/" element={user?.role === 'admin' ? <Navigate to="/admin" /> : <Feed />} />
                 <Route path="/profile" element={<Profile />} />
                 {user?.role === 'admin' && <Route path="/admin" element={<Admin />} />}
               </Routes>

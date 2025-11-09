@@ -18,6 +18,7 @@ class UserUpdate(BaseModel):
 class User(UserBase):
     id: int
     role: Optional[str] = None
+    is_admin: Optional[bool] = None
     joined_at: Optional[datetime] = None  # ✅ Make it optional to avoid ResponseValidationError
     is_active: bool
 

@@ -65,7 +65,8 @@ async def register(user_data: UserCreate, background_tasks: BackgroundTasks, db:
         email=user_data.email.strip().lower(),
         hashed_password=hashed_password,  # ✅ Correct field name
         department=user_data.department.strip(),
-        is_admin=(user_data.role == "admin"),
+        role=user_data.role,  # ✅ persist role so admin guard works
+        is_admin=(user_data.role == "admin"),  # kept for backward compatibility
         is_active=False
     )
 

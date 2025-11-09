@@ -185,21 +185,23 @@ async def get_shoutout(
     if not shoutout:
         raise HTTPException(status_code=404, detail="Shoutout not found")
     
-    has_department_access = (
-        db.query(ShoutOutRecipient)
-        .join(User, ShoutOutRecipient.recipient_id == User.id)
-        .filter(
-            ShoutOutRecipient.shoutout_id == shoutout_id,
-            User.department == current_user.department
+    # Admins can view any shoutout regardless of department
+    is_admin = (current_user.role == "admin" or getattr(current_user, "is_admin", False))
+    if not is_admin:
+        has_department_access = (
+            db.query(ShoutOutRecipient)
+            .join(User, ShoutOutRecipient.recipient_id == User.id)
+            .filter(
+                ShoutOutRecipient.shoutout_id == shoutout_id,
+                User.department == current_user.department
+            )
+            .first()
         )
-        .first()
-    )
-    
-    if not has_department_access:
-        raise HTTPException(
-            status_code=403, 
-            detail="Not authorized to view this shoutout"
-        )
+        if not has_department_access:
+            raise HTTPException(
+                status_code=403, 
+                detail="Not authorized to view this shoutout"
+            )
     
     return format_shoutout(shoutout, current_user.id, db)
 
@@ -236,7 +238,8 @@ async def delete_shoutout(
     if not shoutout:
         raise HTTPException(status_code=404, detail="Shoutout not found")
     
-    if shoutout.sender_id != current_user.id and current_user.role != "admin":
+    # Allow legacy admins with is_admin True
+    if shoutout.sender_id != current_user.id and not (current_user.role == "admin" or getattr(current_user, "is_admin", False)):
         raise HTTPException(status_code=403, detail="Not authorized to delete this shoutout")
     
     db.delete(shoutout)
