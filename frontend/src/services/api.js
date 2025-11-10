@@ -96,7 +96,7 @@ export const reactionAPI = {
 
 export const adminAPI = {
   getAnalytics: () => api.get('/admin/analytics'),
-  getReports: (status) => api.get('/admin/reports', { params: { status } }),
+  getReports: (status) => api.get('/admin/reports', { params: status ? { status } : undefined }),
   resolveReport: (reportId, action) => api.post(`/admin/reports/${reportId}/resolve`, { action }),
   deleteShoutout: (id) => api.delete(`/admin/shoutouts/${id}`),
   getLeaderboard: () => api.get('/admin/leaderboard'),
