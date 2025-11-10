@@ -5,6 +5,8 @@ import { useEffect, useState, useCallback } from 'react';
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [mounted, setMounted] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const [isDark, setIsDark] = useState(() => {
     try {
       const stored = localStorage.getItem('theme');
@@ -41,6 +43,15 @@ export default function Navbar() {
     return () => mq.removeEventListener('change', handler);
   }, [applyTheme, isDark]);
 
+  // Mount + scroll detection for animated, blurred navbar
+  useEffect(() => {
+    setMounted(true);
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const toggleTheme = () => {
     const next = !isDark;
     applyTheme(next);
@@ -58,8 +69,14 @@ export default function Navbar() {
     navigate('/login');
   };
 
+  const navClasses = `sticky top-0 z-50 theme-transition backdrop-blur-md border-b transition-[background-color,backdrop-filter,border-color,transform,opacity] duration-300 ${
+    scrolled
+      ? 'bg-white/70 dark:bg-gray-900/60 border-gray-200/20 dark:border-gray-800/60 shadow-sm'
+      : 'bg-white/40 dark:bg-gray-900/40 border-transparent'
+  } ${mounted ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`;
+
   return (
-  <nav className="bg-white shadow-sm dark:bg-gray-900 dark:shadow-black/20 theme-transition">
+  <nav className={navClasses}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
@@ -72,7 +89,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={toggleTheme}
-              className={`relative inline-flex h-7 w-14 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500
+              className={`no-anim relative inline-flex h-7 w-14 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500
                 ${isDark ? 'bg-gray-700 border-gray-600' : 'bg-gray-200 border-gray-300'}`}
               aria-pressed={isDark}
               aria-label="Toggle dark mode"
@@ -110,7 +127,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={resetToSystem}
-              className="px-2 py-1 text-xs border rounded md:inline hidden text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 border-gray-300 dark:border-gray-700"
+              className="btn btn-outline px-2 py-1 text-xs md:inline hidden"
               title="Reset to system theme"
             >
               System
@@ -123,7 +140,7 @@ export default function Navbar() {
               </Link>
               <button
                 onClick={handleLogout}
-                className="text-gray-700 hover:text-blue-600 text-lg dark:text-gray-200 dark:hover:text-blue-400"
+                className="btn btn-ghost text-lg px-3 py-1"
               >
                 Logout
               </button>

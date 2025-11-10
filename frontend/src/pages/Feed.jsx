@@ -23,7 +23,7 @@ export default function Feed() {
 
   const fetchShoutouts = async () => {
     try {
-      const params = {};
+      const params = { all_departments: true }; // Fetch from all departments
       if (filterDept) params.department = filterDept;
       if (filterSender) params.sender_id = filterSender;
       if (startDate) params.start_date = startDate;
@@ -107,7 +107,7 @@ export default function Feed() {
       <div className="max-w-2xl mx-auto py-8 px-4 page-container">
         <div className="mb-4 flex flex-col gap-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{user?.department} Feed</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Departments Feed</h1>
             <div className="flex gap-2">
               <button
                 type="button"

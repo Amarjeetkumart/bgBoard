@@ -141,17 +141,23 @@ async def get_shoutouts(
     sender_id: Optional[int] = None,
     start_date: Optional[str] = None,  # YYYY-MM-DD
     end_date: Optional[str] = None,    # YYYY-MM-DD
+    all_departments: bool = False,     # NEW: Flag to fetch from all departments
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    # Base query: restrict to the current user's department by recipient membership
-    shoutouts_query = (
-        db.query(ShoutOut)
-        .join(ShoutOutRecipient, ShoutOut.id == ShoutOutRecipient.shoutout_id)
-        .join(User, ShoutOutRecipient.recipient_id == User.id)
-        .filter(User.department == current_user.department)
-        .distinct()
-    )
+    # Base query: optionally restrict to the current user's department by recipient membership
+    if all_departments:
+        # Fetch all shoutouts from all departments
+        shoutouts_query = db.query(ShoutOut).distinct()
+    else:
+        # Restrict to current user's department (original behavior)
+        shoutouts_query = (
+            db.query(ShoutOut)
+            .join(ShoutOutRecipient, ShoutOut.id == ShoutOutRecipient.shoutout_id)
+            .join(User, ShoutOutRecipient.recipient_id == User.id)
+            .filter(User.department == current_user.department)
+            .distinct()
+        )
 
     # Optional filters
     if department:
