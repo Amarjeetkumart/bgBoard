@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.reaction import Reaction
-from app.models.shoutout import ShoutOut, ShoutOutRecipient
+from app.models.shoutout import ShoutOut
 from sqlalchemy import func
 from app.schemas.reaction import ReactionCreate, ReactionSummary, ReactionUser
 from app.middleware.auth import get_current_active_user
@@ -29,14 +29,17 @@ async def add_reaction(
         .filter(
             Reaction.shoutout_id == shoutout_id,
             Reaction.user_id == current_user.id,
-            Reaction.type == reaction_data.type
         )
         .first()
     )
-    
+
     if existing_reaction:
-        return {"message": "Reaction already exists"}
-    
+        if existing_reaction.type == reaction_data.type:
+            return {"message": "Reaction already exists"}
+        existing_reaction.type = reaction_data.type
+        db.commit()
+        return {"message": "Reaction updated successfully"}
+
     new_reaction = Reaction(
         shoutout_id=shoutout_id,
         user_id=current_user.id,
@@ -85,19 +88,6 @@ async def list_reactions(
     shoutout = db.query(ShoutOut).filter(ShoutOut.id == shoutout_id).first()
     if not shoutout:
         raise HTTPException(status_code=404, detail="Shoutout not found")
-
-    # Department-based access: user must be in same department as at least one recipient
-    has_department_access = (
-        db.query(ShoutOutRecipient)
-        .join(User, ShoutOutRecipient.recipient_id == User.id)
-        .filter(
-            ShoutOutRecipient.shoutout_id == shoutout_id,
-            User.department == current_user.department,
-        )
-        .first()
-    )
-    if not has_department_access:
-        raise HTTPException(status_code=403, detail="Not authorized to view this shoutout's reactions")
 
     # Counts for each type
     counts_rows = (

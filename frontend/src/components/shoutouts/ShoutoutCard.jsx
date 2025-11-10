@@ -1,14 +1,46 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { commentAPI, reactionAPI, adminAPI } from '../../services/api';
 import CommentInput from './CommentInput';
+
+const REACTION_TYPES = [
+  { type: 'like', label: 'Like', icon: '👍' },
+  { type: 'clap', label: 'Clap', icon: '👏' },
+  { type: 'star', label: 'Star', icon: '⭐' },
+];
 
 export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefresh }) {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
-  const [reactorPanel, setReactorPanel] = useState({ open: false, type: null, loading: false, users: [] });
+  const [reactionMenuOpen, setReactionMenuOpen] = useState(false);
+  const [reactionDetails, setReactionDetails] = useState({ open: false, loading: false, counts: {}, usersByType: {} });
   const [reportModal, setReportModal] = useState({ open: false, reason: '', submitting: false, submitted: false, error: '' });
   // no local loading state required for now
+  const reactionMenuTimeoutRef = useRef(null);
+
+  useEffect(() => () => {
+    if (reactionMenuTimeoutRef.current) {
+      clearTimeout(reactionMenuTimeoutRef.current);
+    }
+  }, []);
+
+  const openReactionMenu = () => {
+    if (reactionMenuTimeoutRef.current) {
+      clearTimeout(reactionMenuTimeoutRef.current);
+      reactionMenuTimeoutRef.current = null;
+    }
+    setReactionMenuOpen(true);
+  };
+
+  const scheduleReactionMenuClose = () => {
+    if (reactionMenuTimeoutRef.current) {
+      clearTimeout(reactionMenuTimeoutRef.current);
+    }
+    reactionMenuTimeoutRef.current = setTimeout(() => {
+      setReactionMenuOpen(false);
+      reactionMenuTimeoutRef.current = null;
+    }, 200);
+  };
 
   const loadComments = async () => {
     if (showComments) {
@@ -49,26 +81,44 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
   const handleReactionClick = (type) => {
     const isAdding = !(shoutout.user_reactions || []).includes(type);
     onReaction(shoutout.id, type, isAdding);
+    setReactionMenuOpen(false);
   };
 
-  const openReactors = async (type) => {
-    setReactorPanel({ open: true, type, loading: true, users: [] });
+  const closeReactionDetails = () => setReactionDetails({ open: false, loading: false, counts: {}, usersByType: {} });
+
+  const toggleReactionDetails = async () => {
+    if (reactionDetails.open) {
+      closeReactionDetails();
+      return;
+    }
+    setReactionDetails({ open: true, loading: true, counts: {}, usersByType: {} });
     try {
-      const res = await reactionAPI.listUsers(shoutout.id, type);
-      const users = res.data?.users?.[type] || [];
-      setReactorPanel({ open: true, type, loading: false, users });
+      const res = await reactionAPI.listAllUsers(shoutout.id);
+      setReactionDetails({
+        open: true,
+        loading: false,
+        counts: res.data?.counts || {},
+        usersByType: res.data?.users || {},
+      });
     } catch (e) {
-      console.error('Failed to load reactors', e);
-      setReactorPanel({ open: true, type, loading: false, users: [] });
+      console.error('Failed to load reaction details', e);
+      setReactionDetails({ open: true, loading: false, counts: {}, usersByType: {} });
     }
   };
-
-  const closeReactors = () => setReactorPanel({ open: false, type: null, loading: false, users: [] });
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString();
   };
+
+  const totalReactions = REACTION_TYPES.reduce(
+    (total, reaction) => total + ((shoutout.reaction_counts || {})[reaction.type] || 0),
+    0
+  );
+
+  const userReaction = REACTION_TYPES.find((reaction) => (shoutout.user_reactions || []).includes(reaction.type));
+
+  const primaryReactionType = userReaction?.type || 'like';
 
   return (
   <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow p-6 card">
@@ -100,36 +150,52 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
       </div>
 
       <div className="flex items-center space-x-6 border-t border-gray-200 dark:border-gray-800 pt-4">
-        <button
-          onClick={() => handleReactionClick('like')}
-          className={`flex items-center space-x-1 ${
-            (shoutout.user_reactions || []).includes('like') ? 'text-blue-600' : 'text-gray-500 dark:text-gray-400'
-          } hover:text-blue-600`}
+        <div
+          className="relative"
+          onMouseEnter={openReactionMenu}
+          onMouseLeave={scheduleReactionMenuClose}
         >
-          <span>👍</span>
-          <span>{(shoutout.reaction_counts || {}).like || 0}</span>
-        </button>
-        <button onClick={() => openReactors('like')} className="text-xs text-gray-500 hover:text-blue-600">Who?</button>
-        <button
-          onClick={() => handleReactionClick('clap')}
-          className={`flex items-center space-x-1 ${
-            (shoutout.user_reactions || []).includes('clap') ? 'text-blue-600' : 'text-gray-500 dark:text-gray-400'
-          } hover:text-blue-600`}
-        >
-          <span>👏</span>
-          <span>{(shoutout.reaction_counts || {}).clap || 0}</span>
-        </button>
-        <button onClick={() => openReactors('clap')} className="text-xs text-gray-500 hover:text-blue-600">Who?</button>
-        <button
-          onClick={() => handleReactionClick('star')}
-          className={`flex items-center space-x-1 ${
-            (shoutout.user_reactions || []).includes('star') ? 'text-blue-600' : 'text-gray-500 dark:text-gray-400'
-          } hover:text-blue-600`}
-        >
-          <span>⭐</span>
-          <span>{(shoutout.reaction_counts || {}).star || 0}</span>
-        </button>
-        <button onClick={() => openReactors('star')} className="text-xs text-gray-500 hover:text-blue-600">Who?</button>
+          <button
+            onClick={() => handleReactionClick(primaryReactionType)}
+            className={`flex items-center space-x-2 px-2 py-1 rounded ${
+              userReaction ? 'text-blue-600' : 'text-gray-500 dark:text-gray-400'
+            } hover:text-blue-600`}
+          >
+            <span>{userReaction?.icon || '👍'}</span>
+            <span className="text-sm">{userReaction?.label || 'Like'}</span>
+          </button>
+          {reactionMenuOpen && (
+            <div
+              className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 flex gap-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full shadow-lg px-3 py-2 z-10"
+              onMouseEnter={openReactionMenu}
+              onMouseLeave={scheduleReactionMenuClose}
+            >
+              {REACTION_TYPES.map((reaction) => (
+                <button
+                  key={reaction.type}
+                  onClick={() => handleReactionClick(reaction.type)}
+                  className={`flex flex-col items-center text-xs font-medium ${
+                    (shoutout.user_reactions || []).includes(reaction.type)
+                      ? 'text-blue-600'
+                      : 'text-gray-600 dark:text-gray-300'
+                  } hover:text-blue-600`}
+                >
+                  <span className="text-lg">{reaction.icon}</span>
+                  <span>{reaction.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {totalReactions > 0 && (
+          <button
+            onClick={toggleReactionDetails}
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600"
+            aria-label="View reactions"
+          >
+            {totalReactions}
+          </button>
+        )}
         <button
           onClick={loadComments}
           className="flex items-center space-x-1 text-gray-500 dark:text-gray-400 hover:text-blue-600"
@@ -146,30 +212,46 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
         </button>
       </div>
 
-      {reactorPanel.open && (
+      {reactionDetails.open && (
         <div className="mt-3 border border-gray-200 dark:border-gray-800 rounded-md p-3 bg-gray-50 dark:bg-gray-800">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">
-              {reactorPanel.type === 'like' ? '👍 Likes' : reactorPanel.type === 'clap' ? '👏 Claps' : '⭐ Stars'}
-            </div>
-            <button onClick={closeReactors} className="text-xs text-gray-500 hover:text-gray-700">Close</button>
+            <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">Reactions</div>
+            <button onClick={closeReactionDetails} className="text-xs text-gray-500 hover:text-gray-700">Close</button>
           </div>
-          {reactorPanel.loading ? (
+          {reactionDetails.loading ? (
             <div className="text-sm text-gray-500">Loading…</div>
-          ) : reactorPanel.users.length === 0 ? (
-            <div className="text-sm text-gray-500">No one yet</div>
+          ) : Object.values(reactionDetails.counts || {}).reduce((sum, val) => sum + val, 0) === 0 ? (
+            <div className="text-sm text-gray-500">No reactions yet</div>
           ) : (
-            <ul className="space-y-1">
-              {reactorPanel.users.map(u => (
-                <li key={u.id} className="text-sm text-gray-800 dark:text-gray-100 flex items-center space-x-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">
-                    {u.name?.charAt(0)?.toUpperCase() || '?'}
+            <div className="space-y-3">
+              {REACTION_TYPES.map((reaction) => {
+                const count = reactionDetails.counts?.[reaction.type] || 0;
+                const users = reactionDetails.usersByType?.[reaction.type] || [];
+                if (!count) return null;
+                return (
+                  <div key={reaction.type} className="bg-white/60 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-md p-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                      <span className="text-lg">{reaction.icon}</span>
+                      <span>{reaction.label}</span>
+                      <span className="text-xs text-gray-500">{count}</span>
+                    </div>
+                    <ul className="space-y-1">
+                      {users.map((user) => (
+                        <li key={user.id} className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-100">
+                          <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">
+                            {user.name?.charAt(0)?.toUpperCase() || '?'}
+                          </div>
+                          <div>
+                            <div>{user.name}</div>
+                            <div className="text-xs text-gray-500">{user.email}</div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <span>{u.name}</span>
-                  <span className="text-gray-500">({u.email})</span>
-                </li>
-              ))}
-            </ul>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
