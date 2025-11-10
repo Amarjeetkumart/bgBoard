@@ -157,12 +157,20 @@ export default function Navbar() {
                   className="flex items-center gap-2 rounded-full border border-transparent px-2 py-1 hover:border-gray-300 dark:hover:border-gray-700 transition"
                 >
                   <Avatar src={user.avatar_url} name={user.name} size="sm" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200 hidden sm:inline">{user.name}</span>
+                  <div className="hidden sm:flex flex-col items-start leading-tight">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{user.name}</span>
+                    {user.department ? (
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{user.department}</span>
+                    ) : null}
+                  </div>
                 </button>
                 {menuOpen && (
                   <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 z-50">
                     <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                       <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{user.name}</p>
+                      {user.department ? (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{user.department}</p>
+                      ) : null}
                       <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
                     </div>
                     <button
