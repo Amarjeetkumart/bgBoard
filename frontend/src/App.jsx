@@ -7,6 +7,8 @@ import ResetPassword from './pages/ResetPassword';
 import Feed from './pages/Feed';
 import Admin from './pages/Admin';
 import Profile from './pages/Profile';
+import MyShoutouts from './pages/MyShoutouts';
+import TaggedShoutouts from './pages/TaggedShoutouts';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children }) {
@@ -36,6 +38,8 @@ function AppRoutes() {
               <Routes>
                 <Route path="/" element={user?.role === 'admin' ? <Navigate to="/admin" /> : <Feed />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/my-shoutouts" element={<MyShoutouts />} />
+                <Route path="/shoutouts-for-me" element={<TaggedShoutouts />} />
                 {user?.role === 'admin' && <Route path="/admin" element={<Admin />} />}
               </Routes>
             </Layout>

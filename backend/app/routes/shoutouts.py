@@ -141,6 +141,7 @@ async def get_shoutouts(
     limit: int = 20,
     department: Optional[str] = None,
     sender_id: Optional[int] = None,
+    recipient_id: Optional[int] = None,
     start_date: Optional[str] = None,  # YYYY-MM-DD
     end_date: Optional[str] = None,    # YYYY-MM-DD
     all_departments: bool = False,     # NEW: Flag to fetch from all departments
@@ -168,6 +169,11 @@ async def get_shoutouts(
         shoutouts_query = shoutouts_query.join(
             sender_user, ShoutOut.sender_id == sender_user.id
         ).filter(sender_user.department == department)
+
+    if recipient_id:
+        if all_departments:
+            shoutouts_query = shoutouts_query.join(ShoutOutRecipient, ShoutOutRecipient.shoutout_id == ShoutOut.id)
+        shoutouts_query = shoutouts_query.filter(ShoutOutRecipient.recipient_id == recipient_id)
 
     if sender_id:
         shoutouts_query = shoutouts_query.filter(ShoutOut.sender_id == sender_id)
