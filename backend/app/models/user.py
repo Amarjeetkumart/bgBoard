@@ -17,6 +17,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     role = Column(String, default="employee", nullable=False)  # ✅ make not nullable + default
+    avatar_url = Column(String, nullable=True)
 
     # 👇 Make sure this matches ShoutOut.sender's back_populates
     shoutouts_sent = relationship("ShoutOut", back_populates="sender", foreign_keys=[ShoutOut.sender_id])

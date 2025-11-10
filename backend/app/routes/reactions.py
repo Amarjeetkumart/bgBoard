@@ -110,7 +110,7 @@ async def list_reactions(
             .order_by(User.name.asc())
             .all()
         )
-        users_map[t] = [ReactionUser(id=u.id, name=u.name, email=u.email, department=u.department) for u in rows]
+    users_map[t] = [ReactionUser(id=u.id, name=u.name, email=u.email, department=u.department, avatar_url=u.avatar_url) for u in rows]
 
     # If a specific type was requested, include only that in users but keep counts for all
     if reaction_type is None:

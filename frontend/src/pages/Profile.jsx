@@ -1,7 +1,7 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { userAPI } from '../services/api';
+import Avatar from '../components/common/Avatar';
 
 export default function Profile() {
   const { user, setUser } = useAuth();
@@ -10,13 +10,49 @@ export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [avatarFile, setAvatarFile] = useState(null);
+  const avatarObjectUrlRef = useRef(null);
 
   useEffect(() => {
     if (user) {
-      setName(user.name);
-      setDepartment(user.department);
+      setName(user.name || '');
+      setDepartment(user.department || '');
+      setAvatarPreview(user.avatar_url || '');
+      if (avatarObjectUrlRef.current) {
+        URL.revokeObjectURL(avatarObjectUrlRef.current);
+        avatarObjectUrlRef.current = null;
+      }
+      setAvatarFile(null);
     }
   }, [user]);
+
+  useEffect(() => () => {
+    if (avatarObjectUrlRef.current) {
+      URL.revokeObjectURL(avatarObjectUrlRef.current);
+    }
+  }, []);
+
+  const handleAvatarChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    if (avatarObjectUrlRef.current) {
+      URL.revokeObjectURL(avatarObjectUrlRef.current);
+    }
+    const objectUrl = URL.createObjectURL(file);
+    avatarObjectUrlRef.current = objectUrl;
+    setAvatarPreview(objectUrl);
+  };
+
+  const resetAvatarSelection = () => {
+    if (avatarObjectUrlRef.current) {
+      URL.revokeObjectURL(avatarObjectUrlRef.current);
+      avatarObjectUrlRef.current = null;
+    }
+    setAvatarFile(null);
+    setAvatarPreview(user?.avatar_url || '');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,10 +63,23 @@ export default function Profile() {
     try {
       const payload = user?.role === 'admin' ? { name } : { name, department };
       const response = await userAPI.updateMe(payload);
-      setUser(response.data);
-      // setSuccess('Profile updated successfully!');
+      let updatedUser = response.data;
+
+      if (avatarFile) {
+        const avatarResponse = await userAPI.uploadAvatar(avatarFile);
+        updatedUser = avatarResponse.data;
+        if (avatarObjectUrlRef.current) {
+          URL.revokeObjectURL(avatarObjectUrlRef.current);
+          avatarObjectUrlRef.current = null;
+        }
+        setAvatarFile(null);
+      }
+
+      setUser(updatedUser);
+      setAvatarPreview(updatedUser.avatar_url || '');
+      setSuccess('Profile updated successfully!');
     } catch (err) {
-      // setError(err.response?.data?.detail || 'Failed to update profile');
+      setError(err.response?.data?.detail || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -56,6 +105,35 @@ export default function Profile() {
                 {success}
               </div>
             )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Profile Photo</label>
+              <div className="mt-3 flex items-center gap-4">
+                <Avatar src={avatarPreview || undefined} name={user.name} size="lg" />
+                <div className="flex flex-col gap-2">
+                  <label className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                      disabled={loading}
+                    />
+                    Change Photo
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, WEBP or GIF up to 2MB.</p>
+                  {avatarFile && (
+                    <button
+                      type="button"
+                      onClick={resetAvatarSelection}
+                      className="text-xs text-red-500 hover:text-red-600"
+                      disabled={loading}
+                    >
+                      Cancel new photo
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
               <input

@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import User as UserSchema, UserUpdate
 from app.middleware.auth import get_current_active_user
+import os
+import secrets
+
+AVATAR_DIR = os.path.join(os.getcwd(), "uploads", "avatars")
+os.makedirs(AVATAR_DIR, exist_ok=True)
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -29,6 +34,44 @@ async def update_current_user(
             raise HTTPException(status_code=400, detail="Department cannot be empty")
         current_user.department = user_update.department
     
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+@router.post("/me/avatar", response_model=UserSchema)
+async def upload_avatar(
+    avatar: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    if avatar.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Unsupported image format")
+
+    contents = await avatar.read()
+    MAX_SIZE = 2 * 1024 * 1024  # 2MB limit to keep uploads lightweight
+    if len(contents) > MAX_SIZE:
+        raise HTTPException(status_code=400, detail="Avatar exceeds 2MB size limit")
+
+    _, ext = os.path.splitext(avatar.filename or "avatar")
+    safe_name = f"{current_user.id}_{secrets.token_hex(8)}{ext or '.png'}"
+    file_path = os.path.join(AVATAR_DIR, safe_name)
+
+    # Remove previous avatar if it exists inside our managed directory
+    if current_user.avatar_url and current_user.avatar_url.startswith("/uploads/"):
+        uploads_root = os.path.join(os.getcwd(), "uploads")
+        relative_path = current_user.avatar_url[len("/uploads/"):]
+        old_path = os.path.join(uploads_root, relative_path)
+        if os.path.commonpath([uploads_root, os.path.abspath(old_path)]) == uploads_root and os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(contents)
+
+    current_user.avatar_url = f"/uploads/avatars/{safe_name}"
     db.commit()
     db.refresh(current_user)
     return current_user

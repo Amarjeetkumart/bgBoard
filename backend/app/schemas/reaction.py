@@ -21,6 +21,7 @@ class ReactionUser(BaseModel):
     name: str
     email: str
     department: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class ReactionSummary(BaseModel):

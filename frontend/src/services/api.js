@@ -54,6 +54,13 @@ export const authAPI = {
 export const userAPI = {
   getMe: () => api.get('/users/me'),
   updateMe: (data) => api.put('/users/me', data),
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return api.post('/users/me/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   getUsers: (department) => api.get('/users', { params: { department } }),
   search: (query) => api.get('/users/search', { params: { query } }),
 };

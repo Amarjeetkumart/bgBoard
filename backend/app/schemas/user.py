@@ -6,6 +6,7 @@ class UserBase(BaseModel):
     email: EmailStr
     name: str
     department: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -14,6 +15,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     department: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class User(UserBase):
     id: int

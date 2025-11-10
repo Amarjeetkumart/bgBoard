@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { commentAPI, reactionAPI, adminAPI } from '../../services/api';
 import CommentInput from './CommentInput';
+import Avatar from '../common/Avatar';
 
 const REACTION_TYPES = [
   { type: 'like', label: 'Like', icon: '👍' },
@@ -94,11 +95,40 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
     setReactionDetails({ open: true, loading: true, counts: {}, usersByType: {} });
     try {
       const res = await reactionAPI.listAllUsers(shoutout.id);
+      const counts = res.data?.counts || {};
+      let usersByType = res.data?.users || {};
+
+      const missingTypes = REACTION_TYPES.filter((reaction) => {
+        const declaredCount = counts?.[reaction.type];
+        const existingUsers = usersByType?.[reaction.type] || [];
+        const needsUsers = (typeof declaredCount === 'number' && declaredCount > 0 && existingUsers.length === 0);
+        return needsUsers;
+      });
+
+      if (missingTypes.length) {
+        const fetched = await Promise.all(
+          missingTypes.map(async (reaction) => {
+            try {
+              const extra = await reactionAPI.listUsers(shoutout.id, reaction.type);
+              return extra.data?.users?.[reaction.type] || [];
+            } catch (err) {
+              console.error('Failed to fetch reaction users for type', reaction.type, err);
+              return [];
+            }
+          })
+        );
+
+        usersByType = { ...usersByType };
+        missingTypes.forEach((reaction, index) => {
+          usersByType[reaction.type] = fetched[index];
+        });
+      }
+
       setReactionDetails({
         open: true,
         loading: false,
-        counts: res.data?.counts || {},
-        usersByType: res.data?.users || {},
+        counts,
+        usersByType,
       });
     } catch (e) {
       console.error('Failed to load reaction details', e);
@@ -123,8 +153,8 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
   return (
   <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow p-6 card">
       <div className="flex items-start space-x-3 mb-4">
-        <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-          {(shoutout.sender?.name?.charAt(0)?.toUpperCase()) || '?'}
+        <div className="flex-shrink-0">
+          <Avatar src={shoutout.sender?.avatar_url} name={shoutout.sender?.name} />
         </div>
         <div className="flex-1">
           <div className="flex items-center justify-between">
@@ -228,22 +258,21 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
           ) : (
             <div className="space-y-3">
               {REACTION_TYPES.map((reaction) => {
-                const count = reactionDetails.counts?.[reaction.type] || 0;
                 const users = reactionDetails.usersByType?.[reaction.type] || [];
-                if (!count) return null;
+                const count = reactionDetails.counts?.[reaction.type];
+                const displayCount = typeof count === 'number' ? count : users.length;
+                if (displayCount === 0 && users.length === 0) return null;
                 return (
                   <div key={reaction.type} className="bg-white/60 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-md p-2">
                     <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                       <span className="text-lg">{reaction.icon}</span>
                       <span>{reaction.label}</span>
-                      <span className="text-xs text-gray-500">{count}</span>
+                      <span className="text-xs text-gray-500">{displayCount}</span>
                     </div>
                     <ul className="space-y-1">
                       {users.map((user) => (
                         <li key={user.id} className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-100">
-                          <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">
-                            {user.name?.charAt(0)?.toUpperCase() || '?'}
-                          </div>
+                          <Avatar src={user.avatar_url} name={user.name} size="xs" className="flex-shrink-0" />
                           <div>
                             <div>{user.name}</div>
                             <div className="text-xs text-gray-500">{user.email}</div>
@@ -264,8 +293,8 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
           <div className="space-y-3 mb-4">
             {comments.map((comment) => (
               <div key={comment.id} className="flex space-x-2">
-                <div className="flex-shrink-0 w-8 h-8 bg-gray-300 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-200 text-sm">
-                  {(comment.user?.name?.charAt(0)?.toUpperCase()) || '?'}
+                <div className="flex-shrink-0">
+                  <Avatar src={comment.user?.avatar_url} name={comment.user?.name} size="sm" />
                 </div>
                 <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                   <div className="flex items-center space-x-2">

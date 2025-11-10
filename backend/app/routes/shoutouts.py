@@ -50,14 +50,16 @@ def format_shoutout(shoutout, user_id, db):
             "id": shoutout.sender.id,
             "name": shoutout.sender.name,
             "email": shoutout.sender.email,
-            "department": shoutout.sender.department
+            "department": shoutout.sender.department,
+            "avatar_url": shoutout.sender.avatar_url,
         },
         "recipients": [
             {
                 "id": r.recipient.id,
                 "name": r.recipient.name,
                 "email": r.recipient.email,
-                "department": r.recipient.department
+                "department": r.recipient.department,
+                "avatar_url": r.recipient.avatar_url,
             }
             for r in shoutout.recipients
         ],
