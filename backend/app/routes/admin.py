@@ -6,9 +6,12 @@ from typing import List, Optional
 from app.database import get_db
 from app.models.user import User
 from app.models.shoutout import ShoutOut, ShoutOutRecipient
+from app.models.comment import Comment
 from app.models.report import Report
+from app.models.comment_report import CommentReport as CommentReportModel
 from app.models.admin_log import AdminLog
 from app.schemas.report import Report as ReportSchema, ReportCreate, ReportResolve
+from app.schemas.comment_report import CommentReport as CommentReportSchema
 from app.schemas.user import User as UserSchema
 from app.middleware.auth import get_current_active_user, require_admin
 from app.models.department_change import DepartmentChangeRequest
@@ -118,6 +121,23 @@ async def get_reports(
     reports = query.order_by(Report.created_at.desc()).all()
     return reports
 
+
+@router.get("/comment-reports", response_model=List[CommentReportSchema])
+async def get_comment_reports(
+    status: str = None,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    query = db.query(CommentReportModel).options(
+        joinedload(CommentReportModel.comment).joinedload(Comment.user),
+        joinedload(CommentReportModel.reporter),
+    )
+
+    if status:
+        query = query.filter(CommentReportModel.status == status)
+
+    return query.order_by(CommentReportModel.created_at.desc()).all()
+
 @router.post("/reports/{report_id}/resolve")
 async def resolve_report(
     report_id: int,
@@ -149,6 +169,36 @@ async def resolve_report(
     db.commit()
 
     return {"message": f"Report {action} successfully"}
+
+
+@router.post("/comment-reports/{report_id}/resolve")
+async def resolve_comment_report(
+    report_id: int,
+    payload: ReportResolve,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    report = db.query(CommentReportModel).filter(CommentReportModel.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Comment report not found")
+
+    action = payload.action
+    if action not in ["approved", "rejected"]:
+        raise HTTPException(status_code=400, detail="Invalid action")
+
+    report.status = action
+
+    admin_log = AdminLog(
+        admin_id=admin.id,
+        action=f"Resolved comment report #{report_id} with action: {action}",
+        target_id=report_id,
+        target_type="comment_report"
+    )
+    db.add(admin_log)
+
+    db.commit()
+
+    return {"message": f"Comment report {action} successfully"}
 
 
 @router.get("/department-change-requests", response_model=List[DepartmentChangeSchema])

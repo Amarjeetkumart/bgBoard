@@ -9,16 +9,20 @@ export default function Admin() {
   const navigate = useNavigate();
   const [analytics, setAnalytics] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
-  const [reports, setReports] = useState([]);
+  const [shoutoutReports, setShoutoutReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [shoutoutPreview, setShoutoutPreview] = useState({ open: false, data: null, loading: false, error: '' });
   const [departmentRequests, setDepartmentRequests] = useState([]);
   const [requestFilter, setRequestFilter] = useState('pending');
   const [requestLoading, setRequestLoading] = useState(false);
   const [processingRequestId, setProcessingRequestId] = useState(null);
-  const [reportFilter, setReportFilter] = useState('pending');
-  const [reportLoading, setReportLoading] = useState(false);
-  const [resolvingReportId, setResolvingReportId] = useState(null);
+  const [shoutoutReportFilter, setShoutoutReportFilter] = useState('pending');
+  const [shoutoutReportLoading, setShoutoutReportLoading] = useState(false);
+  const [resolvingShoutoutReportId, setResolvingShoutoutReportId] = useState(null);
+  const [commentReports, setCommentReports] = useState([]);
+  const [commentReportFilter, setCommentReportFilter] = useState('pending');
+  const [commentReportLoading, setCommentReportLoading] = useState(false);
+  const [resolvingCommentReportId, setResolvingCommentReportId] = useState(null);
 
   const fetchDepartmentRequests = async (statusOverride) => {
     const status = statusOverride ?? requestFilter;
@@ -55,8 +59,16 @@ export default function Admin() {
     if (!user || user.role !== 'admin') {
       return;
     }
-    fetchReports();
-  }, [authLoading, user, reportFilter]);
+    fetchShoutoutReports();
+  }, [authLoading, user, shoutoutReportFilter]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user || user.role !== 'admin') {
+      return;
+    }
+    fetchCommentReports();
+  }, [authLoading, user, commentReportFilter]);
 
   const fetchData = async () => {
     try {
@@ -73,28 +85,41 @@ export default function Admin() {
     }
   };
 
-  const fetchReports = async (statusOverride) => {
-    const status = statusOverride ?? reportFilter;
-    setReportLoading(true);
+  const fetchShoutoutReports = async (statusOverride) => {
+    const status = statusOverride ?? shoutoutReportFilter;
+    setShoutoutReportLoading(true);
     try {
       const res = await adminAPI.getReports(status === 'all' ? undefined : status);
-      setReports(res.data || []);
+      setShoutoutReports(res.data || []);
     } catch (error) {
-      console.error('Error fetching reports:', error);
+      console.error('Error fetching shout-out reports:', error);
     } finally {
-      setReportLoading(false);
+      setShoutoutReportLoading(false);
     }
   };
 
-  const handleResolve = async (reportId, action) => {
-    setResolvingReportId(reportId);
+  const fetchCommentReports = async (statusOverride) => {
+    const status = statusOverride ?? commentReportFilter;
+    setCommentReportLoading(true);
+    try {
+      const res = await adminAPI.getCommentReports(status === 'all' ? undefined : status);
+      setCommentReports(res.data || []);
+    } catch (error) {
+      console.error('Error fetching comment reports:', error);
+    } finally {
+      setCommentReportLoading(false);
+    }
+  };
+
+  const handleResolveShoutoutReport = async (reportId, action) => {
+    setResolvingShoutoutReportId(reportId);
     try {
       await adminAPI.resolveReport(reportId, action);
-      await fetchReports();
+      await fetchShoutoutReports();
     } catch (e) {
       console.error('Failed to resolve report', e);
     } finally {
-      setResolvingReportId(null);
+      setResolvingShoutoutReportId(null);
     }
   };
 
@@ -103,9 +128,31 @@ export default function Admin() {
       await adminAPI.deleteShoutout(id);
       // refresh both analytics and reports as counts change
       fetchData();
-      fetchReports();
+      fetchShoutoutReports();
     } catch (e) {
       console.error('Failed to delete shoutout', e);
+    }
+  };
+
+  const handleResolveCommentReport = async (reportId, action) => {
+    setResolvingCommentReportId(reportId);
+    try {
+      await adminAPI.resolveCommentReport(reportId, action);
+      await fetchCommentReports();
+    } catch (e) {
+      console.error('Failed to resolve comment report', e);
+    } finally {
+      setResolvingCommentReportId(null);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    try {
+      await adminAPI.deleteComment(commentId);
+      await fetchCommentReports();
+      fetchShoutoutReports();
+    } catch (e) {
+      console.error('Failed to delete comment', e);
     }
   };
 
@@ -157,7 +204,6 @@ export default function Admin() {
             <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{analytics?.total_shoutouts || 0}</p>
           </div>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Top Contributors</h2>
@@ -299,8 +345,8 @@ export default function Admin() {
               <label htmlFor="report-filter" className="text-sm text-gray-600 dark:text-gray-400">Status</label>
               <select
                 id="report-filter"
-                value={reportFilter}
-                onChange={(e) => setReportFilter(e.target.value)}
+                value={shoutoutReportFilter}
+                onChange={(e) => setShoutoutReportFilter(e.target.value)}
                 className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-700 dark:text-gray-300"
               >
                 <option value="pending">Pending</option>
@@ -310,9 +356,9 @@ export default function Admin() {
               </select>
             </div>
           </div>
-          {reportLoading ? (
+          {shoutoutReportLoading ? (
             <p className="text-gray-500 dark:text-gray-400">Loading reports...</p>
-          ) : reports.length === 0 ? (
+          ) : shoutoutReports.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400">No reports for this filter.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -327,8 +373,8 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-                  {reports.map((r) => {
-                    const isResolving = resolvingReportId === r.id;
+                  {shoutoutReports.map((r) => {
+                    const isResolving = resolvingShoutoutReportId === r.id;
                     return (
                       <tr key={r.id}>
                         <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">#{r.id}</td>
@@ -344,14 +390,14 @@ export default function Admin() {
                           {r.status === 'pending' ? (
                             <>
                               <button
-                                onClick={() => handleResolve(r.id, 'approved')}
+                                onClick={() => handleResolveShoutoutReport(r.id, 'approved')}
                                 disabled={isResolving}
                                 className={`px-3 py-1 text-white rounded text-sm ${isResolving ? 'bg-green-500/60 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
                               >
                                 Approve
                               </button>
                               <button
-                                onClick={() => handleResolve(r.id, 'rejected')}
+                                onClick={() => handleResolveShoutoutReport(r.id, 'rejected')}
                                 disabled={isResolving}
                                 className={`px-3 py-1 text-white rounded text-sm ${isResolving ? 'bg-gray-500/60 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700'}`}
                               >
@@ -360,6 +406,108 @@ export default function Admin() {
                             </>
                           ) : (
                             <span className="text-xs text-gray-500 dark:text-gray-400">No action required</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow mt-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Reported Comments</h2>
+            <div className="flex items-center gap-2">
+              <label htmlFor="comment-report-filter" className="text-sm text-gray-600 dark:text-gray-400">Status</label>
+              <select
+                id="comment-report-filter"
+                value={commentReportFilter}
+                onChange={(e) => setCommentReportFilter(e.target.value)}
+                className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-700 dark:text-gray-300"
+              >
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+          </div>
+          {commentReportLoading ? (
+            <p className="text-gray-500 dark:text-gray-400">Loading comment reports...</p>
+          ) : commentReports.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400">No comment reports for this filter.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                <thead className="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">ID</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Comment</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Reason</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Reporter</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                  {commentReports.map((report) => {
+                    const isResolving = resolvingCommentReportId === report.id;
+                    return (
+                      <tr key={report.id}>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">#{report.id}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 max-w-xs">
+                          <div className="font-medium text-gray-900 dark:text-gray-100">{report.comment?.user?.name || 'Unknown commenter'}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Comment #{report.comment_id}</div>
+                          <p className="text-sm text-gray-700 dark:text-gray-200 truncate" title={report.comment?.content || ''}>
+                            {report.comment?.content || 'Deleted comment'}
+                          </p>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 max-w-sm truncate" title={report.reason}>{report.reason}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                          <div>{report.reporter?.name || 'Unknown user'}</div>
+                          {report.reporter?.email && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{report.reporter.email}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          <span className={`px-2 py-1 rounded text-xs ${report.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : report.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{report.status}</span>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-right space-y-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <button
+                              onClick={() => openShoutout(report.shoutout_id)}
+                              className="px-3 py-1 text-blue-600 hover:text-blue-700"
+                            >
+                              View Shout-Out
+                            </button>
+                            <button
+                              onClick={() => handleDeleteComment(report.comment_id)}
+                              className="px-3 py-1 text-red-600 hover:text-red-700"
+                            >
+                              Delete Comment
+                            </button>
+                          </div>
+                          {report.status === 'pending' ? (
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleResolveCommentReport(report.id, 'approved')}
+                                disabled={isResolving}
+                                className={`px-3 py-1 text-white rounded text-sm ${isResolving ? 'bg-green-500/60 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleResolveCommentReport(report.id, 'rejected')}
+                                disabled={isResolving}
+                                className={`px-3 py-1 text-white rounded text-sm ${isResolving ? 'bg-gray-500/60 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700'}`}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-500 dark:text-gray-400 inline-block">No action required</span>
                           )}
                         </td>
                       </tr>

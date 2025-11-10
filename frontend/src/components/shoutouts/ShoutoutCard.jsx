@@ -9,13 +9,24 @@ const REACTION_TYPES = [
   { type: 'star', label: 'Star', icon: '⭐' },
 ];
 
+const createInitialReportModalState = () => ({
+  open: false,
+  targetType: null,
+  targetId: null,
+  context: null,
+  reason: '',
+  submitting: false,
+  submitted: false,
+  error: '',
+});
+
 export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefresh }) {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [reactionMenuOpen, setReactionMenuOpen] = useState(false);
   const [reactionDetails, setReactionDetails] = useState({ open: false, loading: false, counts: {}, usersByType: {} });
-  const [reportModal, setReportModal] = useState({ open: false, reason: '', submitting: false, submitted: false, error: '' });
+  const [reportModal, setReportModal] = useState(() => createInitialReportModalState());
   // no local loading state required for now
   const reactionMenuTimeoutRef = useRef(null);
 
@@ -237,7 +248,18 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
           <span>{shoutout.comment_count ?? 0}</span>
         </button>
         <button
-          onClick={() => setReportModal({ open: true, reason: '', submitting: false, submitted: false, error: '' })}
+          onClick={() =>
+            setReportModal({
+              ...createInitialReportModalState(),
+              open: true,
+              targetType: 'shoutout',
+              targetId: shoutout.id,
+              context: {
+                preview: shoutout.message,
+                author: shoutout.sender?.name,
+              },
+            })
+          }
           className="ml-auto text-sm text-red-600 hover:text-red-700"
           title="Report this shout-out"
         >
@@ -297,9 +319,29 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
                   <Avatar src={comment.user?.avatar_url} name={comment.user?.name} size="sm" />
                 </div>
                 <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                  <div className="flex items-center space-x-2">
-                    <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">{comment.user?.name || 'Unknown'}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(comment.created_at)}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center space-x-2">
+                      <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">{comment.user?.name || 'Unknown'}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(comment.created_at)}</p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setReportModal({
+                          ...createInitialReportModalState(),
+                          open: true,
+                          targetType: 'comment',
+                          targetId: comment.id,
+                          context: {
+                            preview: comment.content,
+                            author: comment.user?.name,
+                          },
+                        })
+                      }
+                      className="text-xs text-red-600 hover:text-red-700"
+                      title="Report this comment"
+                    >
+                      Report
+                    </button>
                   </div>
                   <p className="text-gray-800 dark:text-gray-100">{renderMentions(comment.content)}</p>
                 </div>
@@ -316,23 +358,36 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
 
       {reportModal.open && (
         <ReportModal
+          targetType={reportModal.targetType}
+          context={reportModal.context}
           reason={reportModal.reason}
           submitting={reportModal.submitting}
           submitted={reportModal.submitted}
           error={reportModal.error}
           onChange={(v) => setReportModal((s) => ({ ...s, reason: v }))}
-          onClose={() => setReportModal({ open: false, reason: '', submitting: false, submitted: false, error: '' })}
+          onClose={() => setReportModal(createInitialReportModalState())}
           onSubmit={async () => {
             if (!reportModal.reason.trim()) {
               setReportModal((s) => ({ ...s, error: 'Please provide a reason.' }));
               return;
             }
+            if (!reportModal.targetType || !reportModal.targetId) {
+              setReportModal((s) => ({ ...s, error: 'Unable to determine what to report.' }));
+              return;
+            }
             try {
               setReportModal((s) => ({ ...s, submitting: true, error: '' }));
-              await adminAPI.reportShoutout(shoutout.id, reportModal.reason.trim());
+              const reason = reportModal.reason.trim();
+              if (reportModal.targetType === 'shoutout') {
+                await adminAPI.reportShoutout(reportModal.targetId, reason);
+              } else if (reportModal.targetType === 'comment') {
+                await commentAPI.report(reportModal.targetId, reason);
+              } else {
+                throw new Error('Unsupported report type');
+              }
               setReportModal((s) => ({ ...s, submitting: false, submitted: true }));
             } catch (e) {
-              const msg = e?.response?.data?.detail || 'Failed to submit report';
+              const msg = e?.response?.data?.detail || e?.message || 'Failed to submit report';
               setReportModal((s) => ({ ...s, submitting: false, error: msg }));
             }
           }}
@@ -383,12 +438,13 @@ function AttachmentPreview({ attachment }) {
   );
 }
 
-function ReportModal({ reason, submitting, submitted, error, onChange, onClose, onSubmit }) {
+function ReportModal({ targetType, context, reason, submitting, submitted, error, onChange, onClose, onSubmit }) {
+  const title = targetType === 'comment' ? 'Report Comment' : 'Report Shout-Out';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Report Shout-Out</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
         </div>
         {submitted ? (
@@ -400,6 +456,20 @@ function ReportModal({ reason, submitting, submitted, error, onChange, onClose, 
           </div>
         ) : (
           <>
+            {context && (context.preview || context.author) && (
+              <div className="mb-4 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded p-3">
+                {context.author && (
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Author</p>
+                )}
+                {context.author && <p className="text-sm text-gray-700 dark:text-gray-200 mb-2">{context.author}</p>}
+                {context.preview && (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Content</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{context.preview}</p>
+                  </div>
+                )}
+              </div>
+            )}
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reason</label>
             <textarea
               rows={4}

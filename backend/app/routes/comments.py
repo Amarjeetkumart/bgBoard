@@ -6,7 +6,9 @@ from app.models.user import User
 from app.models.comment import Comment
 from app.models.shoutout import ShoutOut
 from app.schemas.comment import Comment as CommentSchema, CommentCreate, CommentUpdate
+from app.schemas.comment_report import CommentReport as CommentReportSchema, CommentReportCreate
 from app.middleware.auth import get_current_active_user
+from app.models.comment_report import CommentReport as CommentReportModel
 import re
 from sqlalchemy.orm import joinedload
 
@@ -107,3 +109,51 @@ async def delete_comment(
     db.commit()
     
     return {"message": "Comment deleted successfully"}
+
+
+@router.post("/comments/{comment_id}/report", response_model=CommentReportSchema)
+async def report_comment(
+    comment_id: int,
+    report_data: CommentReportCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    comment = (
+        db.query(Comment)
+        .options(joinedload(Comment.shoutout))
+        .filter(Comment.id == comment_id)
+        .first()
+    )
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    if comment.user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot report your own comment")
+
+    if not report_data.reason or not report_data.reason.strip():
+        raise HTTPException(status_code=400, detail="Report reason cannot be empty")
+
+    existing_report = (
+        db.query(CommentReportModel)
+        .filter(
+            CommentReportModel.comment_id == comment_id,
+            CommentReportModel.reported_by == current_user.id,
+        )
+        .first()
+    )
+    if existing_report:
+        raise HTTPException(status_code=400, detail="You have already reported this comment")
+
+    new_report = CommentReportModel(
+        comment_id=comment_id,
+        shoutout_id=comment.shoutout_id,
+        reported_by=current_user.id,
+        reason=report_data.reason.strip(),
+        status="pending",
+    )
+
+    db.add(new_report)
+    db.commit()
+    db.refresh(new_report)
+
+    return new_report

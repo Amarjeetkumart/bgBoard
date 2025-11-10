@@ -32,3 +32,4 @@ class User(Base):
     reactions = relationship("Reaction", back_populates="user")
     comment_mentions = relationship("Comment", secondary="comment_mentions", back_populates="mentions")
     reports = relationship("Report", back_populates="reporter", cascade="all, delete-orphan")
+    comment_reports = relationship("CommentReport", back_populates="reporter", cascade="all, delete-orphan")

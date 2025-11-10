@@ -85,6 +85,7 @@ export const commentAPI = {
   getAll: (shoutoutId) => api.get(`/shoutouts/${shoutoutId}/comments`),
   update: (commentId, data) => api.put(`/shoutouts/comments/${commentId}`, data),
   delete: (commentId) => api.delete(`/shoutouts/comments/${commentId}`),
+  report: (commentId, reason) => api.post(`/shoutouts/comments/${commentId}/report`, { reason }),
 };
 
 export const reactionAPI = {
@@ -104,4 +105,6 @@ export const adminAPI = {
   deleteComment: (commentId) => api.delete(`/shoutouts/comments/${commentId}`),
   getDepartmentChangeRequests: (status) => api.get('/admin/department-change-requests', { params: { status } }),
   decideDepartmentChangeRequest: (requestId, action) => api.post(`/admin/department-change-requests/${requestId}/decision`, { action }),
+  getCommentReports: (status) => api.get('/admin/comment-reports', { params: status ? { status } : undefined }),
+  resolveCommentReport: (reportId, action) => api.post(`/admin/comment-reports/${reportId}/resolve`, { action }),
 };

@@ -26,3 +26,4 @@ class Comment(Base):
 
     # 🔹 Many-to-many relationship for mentions
     mentions = relationship("User", secondary="comment_mentions", back_populates="comment_mentions")
+    reports = relationship("CommentReport", back_populates="comment", cascade="all, delete-orphan")
