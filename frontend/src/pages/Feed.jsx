@@ -5,6 +5,8 @@ import CreateShoutout from '../components/shoutouts/CreateShoutout';
 import ShoutoutCard from '../components/shoutouts/ShoutoutCard';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
+const DEPARTMENT_OPTIONS = ['Sales', 'Marketing', 'Engineering', 'HR', 'Finance', 'Operations'].sort((a, b) => a.localeCompare(b));
+
 export default function Feed() {
   const [shoutouts, setShoutouts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -126,12 +128,18 @@ export default function Feed() {
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow flex flex-wrap gap-4 items-end">
             <div className="flex flex-col">
               <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Department (Sender)</label>
-              <input
+              <select
                 value={filterDept}
                 onChange={(e) => setFilterDept(e.target.value)}
-                placeholder="e.g. Sales"
-                className="border px-2 py-1 rounded text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400"
-              />
+                className="border px-2 py-1 rounded text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+              >
+                <option value="">All Departments</option>
+                {DEPARTMENT_OPTIONS.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex flex-col relative">
               <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Sender</label>
