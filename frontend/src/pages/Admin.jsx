@@ -12,6 +12,23 @@ export default function Admin() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [shoutoutPreview, setShoutoutPreview] = useState({ open: false, data: null, loading: false, error: '' });
+  const [departmentRequests, setDepartmentRequests] = useState([]);
+  const [requestFilter, setRequestFilter] = useState('pending');
+  const [requestLoading, setRequestLoading] = useState(false);
+  const [processingRequestId, setProcessingRequestId] = useState(null);
+
+  const fetchDepartmentRequests = async (statusOverride) => {
+    const status = statusOverride ?? requestFilter;
+    setRequestLoading(true);
+    try {
+      const res = await adminAPI.getDepartmentChangeRequests(status === 'all' ? undefined : status);
+      setDepartmentRequests(res.data || []);
+    } catch (error) {
+      console.error('Error fetching department change requests:', error);
+    } finally {
+      setRequestLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -21,6 +38,14 @@ export default function Admin() {
     }
     fetchData();
   }, [authLoading, user]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user || user.role !== 'admin') {
+      return;
+    }
+    fetchDepartmentRequests();
+  }, [authLoading, user, requestFilter]);
 
   const fetchData = async () => {
     try {
@@ -57,6 +82,22 @@ export default function Admin() {
       fetchData();
     } catch (e) {
       console.error('Failed to delete shoutout', e);
+    }
+  };
+
+  const handleDepartmentDecision = async (requestId, action) => {
+    setProcessingRequestId(requestId);
+    try {
+      await adminAPI.decideDepartmentChangeRequest(requestId, action);
+      await fetchDepartmentRequests();
+      if (action === 'approved') {
+        // pending requests list changed, refresh analytics to reflect updated department stats
+        fetchData();
+      }
+    } catch (error) {
+      console.error(`Failed to ${action} request`, error);
+    } finally {
+      setProcessingRequestId(null);
     }
   };
 
@@ -132,6 +173,100 @@ export default function Admin() {
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow">
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Department Stats</h2>
           <DepartmentStatsChart data={analytics?.department_stats} />
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow mt-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Department Change Requests</h2>
+            <div className="flex items-center gap-2">
+              <label htmlFor="department-request-filter" className="text-sm text-gray-600 dark:text-gray-400">Status</label>
+              <select
+                id="department-request-filter"
+                value={requestFilter}
+                onChange={(e) => setRequestFilter(e.target.value)}
+                className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-700 dark:text-gray-300"
+              >
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+          </div>
+
+          {requestLoading ? (
+            <p className="text-gray-500 dark:text-gray-400">Loading requests...</p>
+          ) : departmentRequests.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400">No requests for this filter.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                <thead className="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">ID</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Current</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Requested</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Submitted</th>
+                    <th className="px-4 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                  {departmentRequests.map((req) => {
+                    const isProcessing = processingRequestId === req.id;
+                    return (
+                      <tr key={req.id}>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">#{req.id}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                          <div className="font-medium text-gray-900 dark:text-gray-100">{req.user?.name || 'Unknown user'}</div>
+                          {req.user?.email && <div className="text-xs text-gray-500 dark:text-gray-400">{req.user.email}</div>}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{req.current_department || '--'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{req.requested_department}</td>
+                        <td className="px-4 py-2 text-sm">
+                          <span className={`px-2 py-1 rounded text-xs ${req.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : req.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                            {req.status}
+                          </span>
+                          {req.admin?.name && req.status !== 'pending' && (
+                            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">by {req.admin.name}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                          <div>{new Date(req.created_at).toLocaleString()}</div>
+                          {req.resolved_at && (
+                            <div className="text-xs text-gray-500 dark:text-gray-500">Resolved: {new Date(req.resolved_at).toLocaleString()}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-right space-x-2">
+                          {req.status === 'pending' ? (
+                            <>
+                              <button
+                                onClick={() => handleDepartmentDecision(req.id, 'approved')}
+                                disabled={isProcessing}
+                                className={`px-3 py-1 rounded text-white text-sm ${isProcessing ? 'bg-green-500/60 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleDepartmentDecision(req.id, 'rejected')}
+                                disabled={isProcessing}
+                                className={`px-3 py-1 rounded text-white text-sm ${isProcessing ? 'bg-gray-500/60 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700'}`}
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">No action required</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow mt-8">

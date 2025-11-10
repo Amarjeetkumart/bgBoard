@@ -1,7 +1,8 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from typing import List
+from typing import List, Optional
 from app.database import get_db
 from app.models.user import User
 from app.models.shoutout import ShoutOut, ShoutOutRecipient
@@ -10,6 +11,11 @@ from app.models.admin_log import AdminLog
 from app.schemas.report import Report as ReportSchema, ReportCreate, ReportResolve
 from app.schemas.user import User as UserSchema
 from app.middleware.auth import get_current_active_user, require_admin
+from app.models.department_change import DepartmentChangeRequest
+from app.schemas.department_change import (
+    DepartmentChangeRequest as DepartmentChangeSchema,
+    DepartmentChangeDecision,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -143,6 +149,76 @@ async def resolve_report(
     db.commit()
 
     return {"message": f"Report {action} successfully"}
+
+
+@router.get("/department-change-requests", response_model=List[DepartmentChangeSchema])
+async def list_department_change_requests(
+    status: Optional[str] = None,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    query = db.query(DepartmentChangeRequest).options(
+        joinedload(DepartmentChangeRequest.user),
+        joinedload(DepartmentChangeRequest.admin),
+    ).order_by(DepartmentChangeRequest.created_at.desc())
+
+    if status:
+        query = query.filter(DepartmentChangeRequest.status == status)
+
+    return query.all()
+
+
+@router.post("/department-change-requests/{request_id}/decision", response_model=DepartmentChangeSchema)
+async def decide_department_change_request(
+    request_id: int,
+    payload: DepartmentChangeDecision,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    request = (
+        db.query(DepartmentChangeRequest)
+        .options(
+            joinedload(DepartmentChangeRequest.user),
+            joinedload(DepartmentChangeRequest.admin),
+        )
+        .filter(DepartmentChangeRequest.id == request_id)
+        .first()
+    )
+    if not request:
+        raise HTTPException(status_code=404, detail="Department change request not found")
+
+    if request.status != "pending":
+        raise HTTPException(status_code=400, detail="Request already processed")
+
+    action = payload.action.lower()
+    if action not in {"approved", "rejected"}:
+        raise HTTPException(status_code=400, detail="Invalid action")
+
+    request.status = action
+    request.admin_id = admin.id
+    request.admin = admin
+    request.resolved_at = datetime.utcnow()
+
+    admin_action = f"Department change request #{request_id} {action}"
+
+    if action == "approved":
+        user = db.query(User).filter(User.id == request.user_id).first()
+        if user:
+            user.department = request.requested_department
+            request.user = user
+        admin_action += f"; department set to {request.requested_department}"
+
+    db.add(AdminLog(
+        admin_id=admin.id,
+        action=admin_action,
+        target_id=request_id,
+        target_type="department_change_request"
+    ))
+
+    db.commit()
+    db.refresh(request)
+
+    return request
 
 @router.delete("/shoutouts/{shoutout_id}")
 async def admin_delete_shoutout(

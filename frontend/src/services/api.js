@@ -102,4 +102,6 @@ export const adminAPI = {
   getLeaderboard: () => api.get('/admin/leaderboard'),
   reportShoutout: (shoutoutId, reason) => api.post(`/admin/shoutouts/${shoutoutId}/report`, { reason }),
   deleteComment: (commentId) => api.delete(`/shoutouts/comments/${commentId}`),
+  getDepartmentChangeRequests: (status) => api.get('/admin/department-change-requests', { params: { status } }),
+  decideDepartmentChangeRequest: (requestId, action) => api.post(`/admin/department-change-requests/${requestId}/decision`, { action }),
 };

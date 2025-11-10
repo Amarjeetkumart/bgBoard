@@ -23,6 +23,7 @@ class User(UserBase):
     is_admin: Optional[bool] = None
     joined_at: Optional[datetime] = None  # ✅ Make it optional to avoid ResponseValidationError
     is_active: bool
+    pending_department: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -3,10 +3,12 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
 from app.models.user import User
+from app.models.department_change import DepartmentChangeRequest
 from app.schemas.user import User as UserSchema, UserUpdate
 from app.middleware.auth import get_current_active_user
 import os
 import secrets
+from app.schemas.department_change import DepartmentChangeRequest as DepartmentChangeSchema
 
 AVATAR_DIR = os.path.join(os.getcwd(), "uploads", "avatars")
 os.makedirs(AVATAR_DIR, exist_ok=True)
@@ -15,8 +17,16 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 
 @router.get("/me", response_model=UserSchema)
 async def get_current_user_profile(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ):
+    pending = (
+        db.query(DepartmentChangeRequest)
+        .filter(DepartmentChangeRequest.user_id == current_user.id, DepartmentChangeRequest.status == "pending")
+        .order_by(DepartmentChangeRequest.created_at.desc())
+        .first()
+    )
+    setattr(current_user, "pending_department", pending.requested_department if pending else None)
     return current_user
 
 @router.put("/me", response_model=UserSchema)
@@ -25,18 +35,63 @@ async def update_current_user(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
+    pending_request = (
+        db.query(DepartmentChangeRequest)
+        .filter(DepartmentChangeRequest.user_id == current_user.id, DepartmentChangeRequest.status == "pending")
+        .order_by(DepartmentChangeRequest.created_at.desc())
+        .first()
+    )
+
+    changed = False
+
     if user_update.name is not None:
         if not user_update.name or not user_update.name.strip():
             raise HTTPException(status_code=400, detail="User name cannot be empty")
         current_user.name = user_update.name
+        changed = True
+
+    new_pending_department = None
     if user_update.department is not None:
         if not user_update.department or not user_update.department.strip():
             raise HTTPException(status_code=400, detail="Department cannot be empty")
-        current_user.department = user_update.department
-    
-    db.commit()
+        if user_update.department != current_user.department:
+            if pending_request:
+                pending_request.requested_department = user_update.department
+            else:
+                pending_request = DepartmentChangeRequest(
+                    user_id=current_user.id,
+                    current_department=current_user.department,
+                    requested_department=user_update.department,
+                    status="pending"
+                )
+                db.add(pending_request)
+            changed = True
+            new_pending_department = user_update.department
+
+    if changed:
+        db.commit()
+
     db.refresh(current_user)
+
+    if pending_request and pending_request.status == "pending":
+        new_pending_department = pending_request.requested_department
+
+    setattr(current_user, "pending_department", new_pending_department)
     return current_user
+
+
+@router.get("/me/department-change-requests", response_model=List[DepartmentChangeSchema])
+async def list_my_department_requests(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    requests = (
+        db.query(DepartmentChangeRequest)
+        .filter(DepartmentChangeRequest.user_id == current_user.id)
+        .order_by(DepartmentChangeRequest.created_at.desc())
+        .all()
+    )
+    return requests
 
 @router.post("/me/avatar", response_model=UserSchema)
 async def upload_avatar(
