@@ -130,6 +130,9 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
           <div className="flex items-center justify-between">
             <div>
               <p className="font-semibold text-gray-900 dark:text-gray-100">{shoutout.sender?.name || 'Unknown'}</p>
+              {shoutout.sender?.department && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">{shoutout.sender.department}</p>
+              )}
               <p className="text-sm text-gray-500 dark:text-gray-400">{formatDate(shoutout.created_at)}</p>
             </div>
           </div>
