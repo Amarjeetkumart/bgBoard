@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -247,7 +247,7 @@ async def decide_department_change_request(
     request.status = action
     request.admin_id = admin.id
     request.admin = admin
-    request.resolved_at = datetime.utcnow()
+    request.resolved_at = datetime.now(timezone.utc)
 
     admin_action = f"Department change request #{request_id} {action}"
 
