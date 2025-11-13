@@ -40,6 +40,7 @@ function AppRoutes() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/my-shoutouts" element={<MyShoutouts />} />
                 <Route path="/shoutouts-for-me" element={<TaggedShoutouts />} />
+                <Route path="/feed" element={<Feed />} />
                 {user?.role === 'admin' && <Route path="/admin" element={<Admin />} />}
               </Routes>
             </Layout>

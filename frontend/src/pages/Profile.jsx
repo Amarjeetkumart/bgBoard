@@ -153,7 +153,7 @@ export default function Profile() {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-gray-100 dark:bg-gray-700 sm:text-sm text-gray-900 dark:text-gray-100"
               />
             </div>
-            {user?.role !== 'admin' && (
+            {/* {user?.role !== 'admin' && ( */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
                 <select
@@ -170,7 +170,7 @@ export default function Profile() {
                   <option value="Operations">Operations</option>
                 </select>
               </div>
-            )}
+            {/* )} */}
             <div>
               <button
                 type="submit"
