@@ -162,7 +162,7 @@ export default function Feed() {
               )}
             </div>
             <div className="flex flex-col">
-              <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Start Date</label>
+              <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Date</label>
               <input
                 type="date"
                 value={startDate}
@@ -170,7 +170,7 @@ export default function Feed() {
                 className="border px-2 py-1 rounded text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
               />
             </div>
-            <div className="flex flex-col">
+            {/* <div className="flex flex-col">
               <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">End Date</label>
               <input
                 type="date"
@@ -178,7 +178,7 @@ export default function Feed() {
                 onChange={(e) => setEndDate(e.target.value)}
                 className="border px-2 py-1 rounded text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
               />
-            </div>
+            </div> */}
             <div className="flex gap-2 ml-auto">
               <button
                 type="button"
