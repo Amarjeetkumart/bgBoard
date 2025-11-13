@@ -5,6 +5,7 @@ import Avatar from '../components/common/Avatar';
 
 export default function Profile() {
   const { user, setUser } = useAuth();
+  const departmentRequestSuccessMessage = 'Request has been sent to the Admin successfully!';
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,6 +62,8 @@ export default function Profile() {
     setError('');
 
     try {
+      const originalDepartment = user?.department || '';
+      const departmentChanged = user?.role !== 'admin' && department && department !== originalDepartment;
       const payload = user?.role === 'admin' ? { name } : { name, department };
       const response = await userAPI.updateMe(payload);
       let updatedUser = response.data;
@@ -77,13 +80,18 @@ export default function Profile() {
 
       setUser(updatedUser);
       setAvatarPreview(updatedUser.avatar_url || '');
-      setSuccess('Profile updated successfully!');
+      setSuccess(departmentChanged ? departmentRequestSuccessMessage : 'Profile updated successfully!');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
   };
+
+  const successIsDepartmentRequest = success === departmentRequestSuccessMessage;
+  const successAlertClasses = successIsDepartmentRequest
+    ? 'bg-yellow-100 dark:bg-yellow-900/40 border border-yellow-400 dark:border-yellow-600 text-yellow-800 dark:text-yellow-200'
+    : 'bg-green-100 dark:bg-green-900/40 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300';
 
   if (!user) {
     return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
@@ -101,7 +109,7 @@ export default function Profile() {
               </div>
             )}
             {success && (
-              <div className="bg-green-100 dark:bg-green-900/40 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded">
+              <div className={`${successAlertClasses} px-4 py-3 rounded`}>
                 {success}
               </div>
             )}
