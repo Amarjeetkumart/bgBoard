@@ -10,12 +10,13 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 EMAIL_FROM = os.getenv("EMAIL_FROM") or os.getenv("SMTP_FROM")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5000")
+COMPANY_APPROVER_EMAIL = os.getenv("COMPANY_APPROVER_EMAIL", "admin@bragboard.space")
 
 
 def _build_message(subject: str, to_email: str, html_body: str, text_body: Optional[str] = None) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = EMAIL_FROM or SMTP_USERNAME
+    msg["From"] = f"Brag Board <{EMAIL_FROM}>"
     msg["To"] = to_email
     if text_body:
         msg.set_content(text_body)
@@ -95,3 +96,72 @@ def send_password_reset_email(to_email: str, name: str, token: str) -> None:
         if SMTP_USERNAME and SMTP_PASSWORD:
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
         server.send_message(msg)
+
+
+def send_company_approval_email(name: str, email: str, department: Optional[str], role: str, token: str) -> None:
+        """Notify company approvers about a newly verified user awaiting approval."""
+        if not COMPANY_APPROVER_EMAIL:
+                # Fail silently if no approver email configured
+                return
+
+        approve_link = f"{APP_BASE_URL}/api/auth/company-approval?token={token}&action=approve"
+        reject_link = f"{APP_BASE_URL}/api/auth/company-approval?token={token}&action=reject"
+
+        subject = "New employee waiting for approval"
+        department_display = department or "Not specified"
+        text = (
+                f"A new user has completed email verification.\n\n"
+                f"Name: {name}\n"
+                f"Email: {email}\n"
+                f"Department: {department_display}\n"
+                f"Role: {role}\n\n"
+                f"Approve: {approve_link}\n"
+                f"Reject: {reject_link}\n"
+        )
+
+        html = f"""
+        <div style='font-family: Arial, sans-serif; line-height: 1.6;'>
+            <h2>New Employee Awaiting Approval</h2>
+            <p>A new user has completed email verification and is waiting for company approval.</p>
+            <table style='border-collapse: collapse; margin-bottom: 16px;'>
+                <tr>
+                    <td style='font-weight:bold; padding:4px 12px;'>Name</td>
+                    <td style='padding:4px 12px;'>{name}</td>
+                </tr>
+                <tr>
+                    <td style='font-weight:bold; padding:4px 12px;'>Email</td>
+                    <td style='padding:4px 12px;'>{email}</td>
+                </tr>
+                <tr>
+                    <td style='font-weight:bold; padding:4px 12px;'>Department</td>
+                    <td style='padding:4px 12px;'>{department_display}</td>
+                </tr>
+                <tr>
+                    <td style='font-weight:bold; padding:4px 12px;'>Role</td>
+                    <td style='padding:4px 12px;'>{role}</td>
+                </tr>
+            </table>
+            <p>Please choose an action:</p>
+            <p>
+                <a href="{approve_link}" style="background:#16a34a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;margin-right:12px;display:inline-block">Approve</a>
+                <a href="{reject_link}" style="background:#dc2626;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">Reject</a>
+            </p>
+            <p>If the buttons above do not work, use these links:</p>
+            <p>Approve: <a href="{approve_link}">{approve_link}</a></p>
+            <p>Reject: <a href="{reject_link}">{reject_link}</a></p>
+        </div>
+        """
+
+        if not SMTP_HOST or not (EMAIL_FROM or SMTP_USERNAME):
+                print("[Email] SMTP not configured. Would notify:", COMPANY_APPROVER_EMAIL)
+                print("Subject:", subject)
+                print("Body:\n", text)
+                return
+
+        msg = _build_message(subject, COMPANY_APPROVER_EMAIL, html, text)
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                server.starttls()
+                if SMTP_USERNAME and SMTP_PASSWORD:
+                        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                server.send_message(msg)

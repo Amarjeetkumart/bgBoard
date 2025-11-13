@@ -12,7 +12,9 @@ class User(Base):
     name = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
     department = Column(String)
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=False, nullable=False)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    company_verified = Column(Boolean, default=False, nullable=False)
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -33,3 +35,9 @@ class User(Base):
     comment_mentions = relationship("Comment", secondary="comment_mentions", back_populates="mentions")
     reports = relationship("Report", back_populates="reporter", cascade="all, delete-orphan")
     comment_reports = relationship("CommentReport", back_populates="reporter", cascade="all, delete-orphan")
+
+    approval_requests = relationship(
+        "CompanyApprovalRequest",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )

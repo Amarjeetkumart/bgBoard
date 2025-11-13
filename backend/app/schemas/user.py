@@ -23,6 +23,8 @@ class User(UserBase):
     is_admin: Optional[bool] = None
     joined_at: Optional[datetime] = None  # ✅ Make it optional to avoid ResponseValidationError
     is_active: bool
+    email_verified: bool
+    company_verified: bool
     pending_department: Optional[str] = None
 
     class Config:

@@ -9,6 +9,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const isPendingApproval = error === 'Waiting for company verification';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -54,8 +55,14 @@ export default function Login() {
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="bg-red-100 dark:bg-red-900/40 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded">
-                {error}
+              <div
+                className={`px-4 py-3 rounded border ${
+                  isPendingApproval
+                    ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-400 dark:border-blue-600 text-blue-800 dark:text-blue-300'
+                    : 'bg-red-100 dark:bg-red-900/40 border-red-400 dark:border-red-600 text-red-700 dark:text-red-300'
+                }`}
+              >
+                {isPendingApproval ? 'Waiting for company verification' : error}
               </div>
             )}
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
@@ -21,9 +21,16 @@ from app.utils.security import (
 )
 from app.models.email_verification import EmailVerification
 from app.models.password_reset import PasswordReset
-from app.utils.email import send_verification_email, send_password_reset_email
+from app.models.company_approval import CompanyApprovalRequest
+from app.utils.email import (
+    send_verification_email,
+    send_password_reset_email,
+    send_company_approval_email,
+    COMPANY_APPROVER_EMAIL,
+)
 from datetime import datetime, timedelta, timezone
 import secrets
+from fastapi.responses import HTMLResponse
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -67,7 +74,9 @@ async def register(user_data: UserCreate, background_tasks: BackgroundTasks, db:
         department=user_data.department.strip(),
         role=user_data.role,  # ✅ persist role so admin guard works
         is_admin=(user_data.role == "admin"),  # kept for backward compatibility
-        is_active=False
+        is_active=False,
+        email_verified=False,
+        company_verified=False
     )
 
     db.add(new_user)
@@ -103,6 +112,18 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please verify your email"
+        )
+
+    if not user.company_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Waiting for company verification"
         )
 
     if not user.is_active:
@@ -155,7 +176,7 @@ async def refresh(refresh_data: RefreshRequest, db: Session = Depends(get_db)):
 
 # ---------------- VERIFY EMAIL VIA TOKEN ---------------- #
 @router.get("/verify-email")
-async def verify_email(token: str, db: Session = Depends(get_db)):
+async def verify_email(token: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     verification = db.query(EmailVerification).filter(EmailVerification.token == token).first()
     if not verification:
         raise HTTPException(status_code=400, detail="Invalid verification token")
@@ -171,12 +192,102 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user.is_active = True
+    user.email_verified = True
+    approval_token = None
+    message = "Email verified successfully. You can now log in."
+
+    if user.company_verified:
+        user.is_active = True
+    else:
+        user.is_active = False
+        approval_token = secrets.token_urlsafe(32)
+        expires_at = now + timedelta(days=7)
+
+        approval_request = (
+            db.query(CompanyApprovalRequest)
+            .filter(CompanyApprovalRequest.user_id == user.id, CompanyApprovalRequest.status == "pending")
+            .first()
+        )
+
+        if approval_request:
+            approval_request.token = approval_token
+            approval_request.expires_at = expires_at
+            approval_request.resolved_at = None
+        else:
+            approval_request = CompanyApprovalRequest(
+                user_id=user.id,
+                token=approval_token,
+                expires_at=expires_at,
+                status="pending"
+            )
+            db.add(approval_request)
+
+        message = "Email verified successfully. Waiting for company verification."
+
     verification.consumed = True
     verification.consumed_at = now
     db.commit()
 
-    return {"message": "Email verified successfully. You can now log in."}
+    if approval_token:
+        background_tasks.add_task(
+            send_company_approval_email,
+            user.name,
+            user.email,
+            user.department,
+            user.role,
+            approval_token
+        )
+
+    return {"message": message}
+
+
+@router.get("/company-approval", response_class=HTMLResponse)
+async def handle_company_approval(token: str, action: str, request: Request, db: Session = Depends(get_db)):
+    action_normalized = (action or "").strip().lower()
+    if action_normalized not in {"approve", "reject"}:
+        return HTMLResponse("<h2>Invalid action</h2><p>Please use the Approve or Reject links provided in the email.</p>", status_code=400)
+
+    approval_request = db.query(CompanyApprovalRequest).filter(CompanyApprovalRequest.token == token).first()
+    if not approval_request:
+        return HTMLResponse("<h2>Invalid or expired link</h2><p>The approval request could not be found. It may have already been processed.</p>", status_code=404)
+
+    now = datetime.now(timezone.utc)
+
+    if approval_request.status != "pending":
+        status_text = approval_request.status.capitalize()
+        return HTMLResponse(f"<h2>Request Already {status_text}</h2><p>This request was previously processed.</p>", status_code=200)
+
+    if approval_request.expires_at < now:
+        approval_request.status = "expired"
+        approval_request.resolved_at = now
+        db.commit()
+        return HTMLResponse("<h2>Link Expired</h2><p>The approval link has expired. Ask the employee to verify their email again.</p>", status_code=400)
+
+    user = db.query(User).filter(User.id == approval_request.user_id).first()
+    if not user:
+        approval_request.status = "rejected"
+        approval_request.resolved_at = now
+        db.commit()
+        return HTMLResponse("<h2>User Not Found</h2><p>The user associated with this request no longer exists.</p>", status_code=404)
+
+    approval_request.action_ip = request.client.host if request.client else None
+    if COMPANY_APPROVER_EMAIL:
+        approval_request.action_email = COMPANY_APPROVER_EMAIL
+
+    if action_normalized == "approve":
+        user.company_verified = True
+        user.is_active = user.email_verified and user.company_verified
+        approval_request.status = "approved"
+        approval_request.resolved_at = now
+        db.commit()
+        return HTMLResponse("<h2>User Approved</h2><p>The employee can now log in.</p>", status_code=200)
+
+    # Reject flow: remove the user record and mark the request
+    approval_request.status = "rejected"
+    approval_request.resolved_at = now
+    db.delete(user)
+    db.commit()
+    return HTMLResponse("<h2>User Rejected</h2><p>The user has been removed from the system.</p>", status_code=200)
 
 
 # ---------------- FORGOT PASSWORD ---------------- #
