@@ -15,10 +15,18 @@ export default function Register() {
   const [success, setSuccess] = useState('');
   const { register } = useAuth();
   const navigate = useNavigate();
+  const passwordIsValid = (value) => {
+    // Require 8+ characters including letters, numbers, and special characters.
+    return /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(value);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!passwordIsValid(formData.password)) {
+      setError('Password must be at least 8 characters and include a letter, number, and special character.');
+      return;
+    }
     setLoading(true);
 
     try {
