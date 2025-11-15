@@ -108,17 +108,17 @@ export default function Feed() {
   <div className="min-h-screen bg-gray-50 dark:bg-gray-950 theme-transition" key={(document?.documentElement?.classList.contains('dark') ? 'dark' : 'light')}>
       <div className="max-w-2xl mx-auto py-8 px-4 page-container">
         <div className="mb-4 flex flex-col gap-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Departments Feed</h1>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 sm:justify-end">
               <button
                 type="button"
                 onClick={() => setShowFilters(f => !f)}
-                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800 w-full sm:w-auto"
               >{showFilters ? 'Hide Filters' : 'Show Filters'}</button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 w-full sm:w-auto"
               >
                 Create Shout-Out
               </button>
@@ -126,7 +126,7 @@ export default function Feed() {
           </div>
           {showFilters && (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow flex flex-wrap gap-4 items-end">
-            <div className="flex flex-col">
+            <div className="flex flex-col w-full sm:w-auto">
               <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Department (Sender)</label>
               <select
                 value={filterDept}
@@ -141,7 +141,7 @@ export default function Feed() {
                 ))}
               </select>
             </div>
-            <div className="flex flex-col relative">
+            <div className="flex flex-col relative w-full sm:w-auto">
               <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Sender</label>
               <input
                 value={filterSender}
@@ -161,7 +161,7 @@ export default function Feed() {
                 </ul>
               )}
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col w-full sm:w-auto">
               <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Date</label>
               <input
                 type="date"
@@ -179,16 +179,16 @@ export default function Feed() {
                 className="border px-2 py-1 rounded text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
               />
             </div> */}
-            <div className="flex gap-2 ml-auto">
+            <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
               <button
                 type="button"
                 onClick={fetchShoutouts}
-                className="bg-gray-200 text-gray-800 px-3 py-2 rounded text-sm hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+                className="bg-gray-200 text-gray-800 px-3 py-2 rounded text-sm hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 w-full sm:w-auto"
               >Apply</button>
               <button
                 type="button"
                 onClick={resetFilters}
-                className="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600"
+                className="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 w-full sm:w-auto"
               >Reset</button>
             </div>
           </div>

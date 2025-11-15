@@ -162,8 +162,8 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
   const primaryReactionType = userReaction?.type || 'like';
 
   return (
-  <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow p-6 card">
-      <div className="flex items-start space-x-3 mb-4">
+  <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow p-4 sm:p-6 card">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:space-x-3 mb-4">
         <div className="flex-shrink-0">
           <Avatar src={shoutout.sender?.avatar_url} name={shoutout.sender?.name} />
         </div>
@@ -179,7 +179,7 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
           </div>
           <p className="text-gray-800 dark:text-gray-100 mt-2">{shoutout.message}</p>
           {Array.isArray(shoutout.attachments) && shoutout.attachments.length > 0 && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {shoutout.attachments.map((att, idx) => (
                 <AttachmentPreview key={idx} attachment={att} />
               ))}
@@ -193,7 +193,7 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
         </div>
       </div>
 
-      <div className="flex items-center space-x-6 border-t border-gray-200 dark:border-gray-800 pt-4">
+  <div className="flex flex-wrap items-center gap-4 border-t border-gray-200 dark:border-gray-800 pt-4">
         <div
           className="relative"
           onMouseEnter={openReactionMenu}
