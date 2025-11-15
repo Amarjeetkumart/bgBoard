@@ -4,6 +4,9 @@ from datetime import datetime
 class ReportCreate(BaseModel):
     reason: str
 
+class ReportResolve(BaseModel):
+    action: str  # expected values: "approved" | "rejected"
+
 class Report(BaseModel):
     id: int
     shoutout_id: int

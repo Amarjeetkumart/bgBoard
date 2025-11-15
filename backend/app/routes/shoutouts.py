@@ -10,6 +10,7 @@ from app.models.comment import Comment
 from app.schemas.shoutout import ShoutOut as ShoutOutSchema, ShoutOutCreate, ShoutOutUpdate
 import os, secrets, shutil
 from app.middleware.auth import get_current_active_user
+from app.utils.notifications import create_notification
 
 router = APIRouter(prefix="/api/shoutouts", tags=["shoutouts"])
 
@@ -50,14 +51,16 @@ def format_shoutout(shoutout, user_id, db):
             "id": shoutout.sender.id,
             "name": shoutout.sender.name,
             "email": shoutout.sender.email,
-            "department": shoutout.sender.department
+            "department": shoutout.sender.department,
+            "avatar_url": shoutout.sender.avatar_url,
         },
         "recipients": [
             {
                 "id": r.recipient.id,
                 "name": r.recipient.name,
                 "email": r.recipient.email,
-                "department": r.recipient.department
+                "department": r.recipient.department,
+                "avatar_url": r.recipient.avatar_url,
             }
             for r in shoutout.recipients
         ],
@@ -88,6 +91,7 @@ async def create_shoutout(
     db.flush()
 
     # Validate recipients
+    recipient_objects = []
     for recipient_id in recipient_ids:
         recipient = db.query(User).filter(User.id == recipient_id).first()
         if not recipient:
@@ -98,6 +102,7 @@ async def create_shoutout(
             raise HTTPException(status_code=403, detail="Can only tag users from your own department")
         shoutout_recipient = ShoutOutRecipient(shoutout_id=new_shoutout.id, recipient_id=recipient_id)
         db.add(shoutout_recipient)
+        recipient_objects.append(recipient)
 
     # Handle file uploads (optional)
     saved_files = []
@@ -129,6 +134,27 @@ async def create_shoutout(
         for f in saved_files:
             db.add(ShoutOutAttachment(shoutout_id=new_shoutout.id, url=f["url"], name=f["name"], type=f.get("type"), size=f.get("size")))
 
+    # Notify tagged recipients
+    preview = (message or "").strip()
+    if len(preview) > 160:
+        preview = f"{preview[:157]}..."
+
+    for recipient in recipient_objects:
+        create_notification(
+            db,
+            user_id=recipient.id,
+            actor_id=current_user.id,
+            event_type="shoutout.received",
+            title=f"{current_user.name} recognized you",
+            message=preview,
+            reference_type="shoutout",
+            reference_id=new_shoutout.id,
+            payload={
+                "shoutout_id": new_shoutout.id,
+                "redirect_url": "/feed",
+            },
+        )
+
     db.commit()
     db.refresh(new_shoutout)
     return format_shoutout(new_shoutout, current_user.id, db)
@@ -139,19 +165,26 @@ async def get_shoutouts(
     limit: int = 20,
     department: Optional[str] = None,
     sender_id: Optional[int] = None,
+    recipient_id: Optional[int] = None,
     start_date: Optional[str] = None,  # YYYY-MM-DD
     end_date: Optional[str] = None,    # YYYY-MM-DD
+    all_departments: bool = False,     # NEW: Flag to fetch from all departments
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    # Base query: restrict to the current user's department by recipient membership
-    shoutouts_query = (
-        db.query(ShoutOut)
-        .join(ShoutOutRecipient, ShoutOut.id == ShoutOutRecipient.shoutout_id)
-        .join(User, ShoutOutRecipient.recipient_id == User.id)
-        .filter(User.department == current_user.department)
-        .distinct()
-    )
+    # Base query: optionally restrict to the current user's department by recipient membership
+    if all_departments:
+        # Fetch all shoutouts from all departments
+        shoutouts_query = db.query(ShoutOut).distinct()
+    else:
+        # Restrict to current user's department (original behavior)
+        shoutouts_query = (
+            db.query(ShoutOut)
+            .join(ShoutOutRecipient, ShoutOut.id == ShoutOutRecipient.shoutout_id)
+            .join(User, ShoutOutRecipient.recipient_id == User.id)
+            .filter(User.department == current_user.department)
+            .distinct()
+        )
 
     # Optional filters
     if department:
@@ -160,6 +193,11 @@ async def get_shoutouts(
         shoutouts_query = shoutouts_query.join(
             sender_user, ShoutOut.sender_id == sender_user.id
         ).filter(sender_user.department == department)
+
+    if recipient_id:
+        if all_departments:
+            shoutouts_query = shoutouts_query.join(ShoutOutRecipient, ShoutOutRecipient.shoutout_id == ShoutOut.id)
+        shoutouts_query = shoutouts_query.filter(ShoutOutRecipient.recipient_id == recipient_id)
 
     if sender_id:
         shoutouts_query = shoutouts_query.filter(ShoutOut.sender_id == sender_id)
@@ -185,21 +223,23 @@ async def get_shoutout(
     if not shoutout:
         raise HTTPException(status_code=404, detail="Shoutout not found")
     
-    has_department_access = (
-        db.query(ShoutOutRecipient)
-        .join(User, ShoutOutRecipient.recipient_id == User.id)
-        .filter(
-            ShoutOutRecipient.shoutout_id == shoutout_id,
-            User.department == current_user.department
+    # Admins can view any shoutout regardless of department
+    is_admin = (current_user.role == "admin" or getattr(current_user, "is_admin", False))
+    if not is_admin:
+        has_department_access = (
+            db.query(ShoutOutRecipient)
+            .join(User, ShoutOutRecipient.recipient_id == User.id)
+            .filter(
+                ShoutOutRecipient.shoutout_id == shoutout_id,
+                User.department == current_user.department
+            )
+            .first()
         )
-        .first()
-    )
-    
-    if not has_department_access:
-        raise HTTPException(
-            status_code=403, 
-            detail="Not authorized to view this shoutout"
-        )
+        if not has_department_access:
+            raise HTTPException(
+                status_code=403, 
+                detail="Not authorized to view this shoutout"
+            )
     
     return format_shoutout(shoutout, current_user.id, db)
 
@@ -236,7 +276,8 @@ async def delete_shoutout(
     if not shoutout:
         raise HTTPException(status_code=404, detail="Shoutout not found")
     
-    if shoutout.sender_id != current_user.id and current_user.role != "admin":
+    # Allow legacy admins with is_admin True
+    if shoutout.sender_id != current_user.id and not (current_user.role == "admin" or getattr(current_user, "is_admin", False)):
         raise HTTPException(status_code=403, detail="Not authorized to delete this shoutout")
     
     db.delete(shoutout)

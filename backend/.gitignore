@@ -15,7 +15,10 @@ eggs/
 *.whl
 
 # Environments
+# Ignore local environment variable files, but keep the example file tracked
 .env
+.env.*
+!.env.example
 venv/
 env/
 # virtualenv environments

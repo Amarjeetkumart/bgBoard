@@ -19,12 +19,21 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
+  const normalizeUser = (raw) => {
+    if (!raw) return raw;
+    // Backward compatibility: if role missing but is_admin flag present
+    if (!raw.role) {
+      raw.role = raw.is_admin ? 'admin' : 'employee';
+    }
+    return raw;
+  };
+
   const checkAuth = async () => {
     const token = localStorage.getItem('access_token');
     if (token) {
       try {
         const response = await userAPI.getMe();
-        setUser(response.data);
+        setUser(normalizeUser(response.data));
       } catch (error) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
@@ -39,18 +48,28 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('access_token', access_token);
     localStorage.setItem('refresh_token', refresh_token);
     const userResponse = await userAPI.getMe();
-    setUser(userResponse.data);
-    return userResponse.data;
+    const normalized = normalizeUser(userResponse.data);
+    setUser(normalized);
+    return normalized;
   };
 
   const register = async (userData) => {
     const response = await authAPI.register(userData);
-    const { access_token, refresh_token } = response.data;
-    localStorage.setItem('access_token', access_token);
-    localStorage.setItem('refresh_token', refresh_token);
-    const userResponse = await userAPI.getMe();
-    setUser(userResponse.data);
-    return userResponse.data;
+    if (response.data?.requires_verification) {
+      // Do not log in yet; wait for email verification
+      return response.data;
+    }
+    // Fallback to legacy behavior if backend still returns tokens
+    const { access_token, refresh_token } = response.data || {};
+    if (access_token && refresh_token) {
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+  const userResponse = await userAPI.getMe();
+  const normalized = normalizeUser(userResponse.data);
+  setUser(normalized);
+  return normalized;
+    }
+    return response.data;
   };
 
   const logout = () => {
@@ -60,7 +79,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );

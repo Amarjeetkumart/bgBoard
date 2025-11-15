@@ -6,6 +6,7 @@ class UserBase(BaseModel):
     email: EmailStr
     name: str
     department: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -14,12 +15,17 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     department: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class User(UserBase):
     id: int
     role: Optional[str] = None
+    is_admin: Optional[bool] = None
     joined_at: Optional[datetime] = None  # ✅ Make it optional to avoid ResponseValidationError
     is_active: bool
+    email_verified: bool
+    company_verified: bool
+    pending_department: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -41,3 +47,25 @@ class LoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class RegistrationResponse(BaseModel):
+    message: str
+    requires_verification: bool = True
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str

@@ -47,11 +47,20 @@ export default api;
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
+  forgotPassword: (data) => api.post('/auth/forgot-password', data),
+  resetPassword: (data) => api.post('/auth/reset-password', data),
 };
 
 export const userAPI = {
   getMe: () => api.get('/users/me'),
   updateMe: (data) => api.put('/users/me', data),
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return api.post('/users/me/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   getUsers: (department) => api.get('/users', { params: { department } }),
   search: (query) => api.get('/users/search', { params: { query } }),
 };
@@ -76,6 +85,7 @@ export const commentAPI = {
   getAll: (shoutoutId) => api.get(`/shoutouts/${shoutoutId}/comments`),
   update: (commentId, data) => api.put(`/shoutouts/comments/${commentId}`, data),
   delete: (commentId) => api.delete(`/shoutouts/comments/${commentId}`),
+  report: (commentId, reason) => api.post(`/shoutouts/comments/${commentId}/report`, { reason }),
 };
 
 export const reactionAPI = {
@@ -87,9 +97,21 @@ export const reactionAPI = {
 
 export const adminAPI = {
   getAnalytics: () => api.get('/admin/analytics'),
-  getReports: (status) => api.get('/admin/reports', { params: { status } }),
+  getReports: (status) => api.get('/admin/reports', { params: status ? { status } : undefined }),
   resolveReport: (reportId, action) => api.post(`/admin/reports/${reportId}/resolve`, { action }),
   deleteShoutout: (id) => api.delete(`/admin/shoutouts/${id}`),
   getLeaderboard: () => api.get('/admin/leaderboard'),
   reportShoutout: (shoutoutId, reason) => api.post(`/admin/shoutouts/${shoutoutId}/report`, { reason }),
+  deleteComment: (commentId) => api.delete(`/shoutouts/comments/${commentId}`),
+  getDepartmentChangeRequests: (status) => api.get('/admin/department-change-requests', { params: { status } }),
+  decideDepartmentChangeRequest: (requestId, action) => api.post(`/admin/department-change-requests/${requestId}/decision`, { action }),
+  getCommentReports: (status) => api.get('/admin/comment-reports', { params: status ? { status } : undefined }),
+  resolveCommentReport: (reportId, action) => api.post(`/admin/comment-reports/${reportId}/resolve`, { action }),
+};
+
+export const notificationsAPI = {
+  list: (params) => api.get('/notifications', { params }),
+  markRead: (ids) => api.post('/notifications/mark-read', ids ? { ids } : {}),
+  markAllRead: () => api.post('/notifications/mark-all-read'),
+  clearAll: () => api.delete('/notifications'),
 };
