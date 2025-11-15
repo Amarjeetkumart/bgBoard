@@ -19,6 +19,7 @@ from app.schemas.department_change import (
     DepartmentChangeRequest as DepartmentChangeSchema,
     DepartmentChangeDecision,
 )
+from app.utils.notifications import create_notification
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -264,6 +265,29 @@ async def decide_department_change_request(
         target_id=request_id,
         target_type="department_change_request"
     ))
+
+    # Notify the user about the decision
+    decision_title = "Department change approved" if action == "approved" else "Department change rejected"
+    decision_message = (
+        f"Your request to move to {request.requested_department} was approved."
+        if action == "approved"
+        else "Your department change request was rejected by the administrator."
+    )
+    create_notification(
+        db,
+        user_id=request.user_id,
+        actor_id=admin.id,
+        event_type="department_change.decision",
+        title=decision_title,
+        message=decision_message,
+        reference_type="department_change_request",
+        reference_id=request.id,
+        payload={
+            "redirect_url": "/profile",
+            "department": request.requested_department,
+            "status": action,
+        },
+    )
 
     db.commit()
     db.refresh(request)

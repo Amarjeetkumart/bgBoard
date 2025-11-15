@@ -41,3 +41,11 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+
+    notifications = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="Notification.created_at.desc()",
+        foreign_keys="Notification.user_id"
+    )

@@ -2,7 +2,7 @@ import os
 import smtplib
 from email.message import EmailMessage
 from typing import Optional
-
+ 
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USERNAME = os.getenv("SMTP_USERNAME")
@@ -11,8 +11,20 @@ EMAIL_FROM = os.getenv("EMAIL_FROM") or os.getenv("SMTP_FROM")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5000")
 COMPANY_APPROVER_EMAIL = os.getenv("COMPANY_APPROVER_EMAIL", "admin@bragboard.space")
-
-
+ 
+_smtp_use_ssl_env = os.getenv("SMTP_USE_SSL")
+if _smtp_use_ssl_env is None:
+    SMTP_USE_SSL = SMTP_PORT == 465
+else:
+    SMTP_USE_SSL = _smtp_use_ssl_env.strip().lower() in {"1", "true", "yes", "on"}
+ 
+_smtp_use_tls_env = os.getenv("SMTP_USE_TLS")
+if _smtp_use_tls_env is None:
+    SMTP_USE_TLS = not SMTP_USE_SSL
+else:
+    SMTP_USE_TLS = _smtp_use_tls_env.strip().lower() in {"1", "true", "yes", "on"}
+ 
+ 
 def _build_message(subject: str, to_email: str, html_body: str, text_body: Optional[str] = None) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -22,8 +34,23 @@ def _build_message(subject: str, to_email: str, html_body: str, text_body: Optio
         msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
     return msg
-
-
+ 
+ 
+def _send_message(msg: EmailMessage) -> None:
+    if SMTP_USE_SSL:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+            if SMTP_USERNAME and SMTP_PASSWORD:
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+    else:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            if SMTP_USE_TLS:
+                server.starttls()
+            if SMTP_USERNAME and SMTP_PASSWORD:
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+ 
+ 
 def send_verification_email(to_email: str, name: str, token: str) -> None:
     """
     Sends a verification email with a unique link to the user.
@@ -45,23 +72,19 @@ def send_verification_email(to_email: str, name: str, token: str) -> None:
       <p>If you didn't create an account, you can ignore this email.</p>
     </div>
     """
-
+ 
     if not SMTP_HOST or not (EMAIL_FROM or SMTP_USERNAME):
         # In development, print to console if SMTP is not configured
         print("[Email] SMTP not configured. Would send to:", to_email)
         print("Subject:", subject)
         print("Body:\n", text)
         return
-
+ 
     msg = _build_message(subject, to_email, html, text)
-
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        server.starttls()
-        if SMTP_USERNAME and SMTP_PASSWORD:
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-        server.send_message(msg)
-
-
+ 
+    _send_message(msg)
+ 
+ 
 def send_password_reset_email(to_email: str, name: str, token: str) -> None:
     """Send password reset email containing a unique link."""
     # Send users to the frontend reset page where they can enter a new password
@@ -83,30 +106,26 @@ def send_password_reset_email(to_email: str, name: str, token: str) -> None:
       <p>If you didn't request this, you can safely ignore this email.</p>
     </div>
     """
-
+ 
     if not SMTP_HOST or not (EMAIL_FROM or SMTP_USERNAME):
         print("[Email] SMTP not configured. Would send password reset to:", to_email)
         print("Subject:", subject)
         print("Body:\n", text)
         return
-
+ 
     msg = _build_message(subject, to_email, html, text)
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        server.starttls()
-        if SMTP_USERNAME and SMTP_PASSWORD:
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-        server.send_message(msg)
-
-
+    _send_message(msg)
+ 
+ 
 def send_company_approval_email(name: str, email: str, department: Optional[str], role: str, token: str) -> None:
         """Notify company approvers about a newly verified user awaiting approval."""
         if not COMPANY_APPROVER_EMAIL:
                 # Fail silently if no approver email configured
                 return
-
+ 
         approve_link = f"{APP_BASE_URL}/api/auth/company-approval?token={token}&action=approve"
         reject_link = f"{APP_BASE_URL}/api/auth/company-approval?token={token}&action=reject"
-
+ 
         subject = "New employee waiting for approval"
         department_display = department or "Not specified"
         text = (
@@ -118,7 +137,7 @@ def send_company_approval_email(name: str, email: str, department: Optional[str]
                 f"Approve: {approve_link}\n"
                 f"Reject: {reject_link}\n"
         )
-
+ 
         html = f"""
         <div style='font-family: Arial, sans-serif; line-height: 1.6;'>
             <h2>New Employee Awaiting Approval</h2>
@@ -151,17 +170,13 @@ def send_company_approval_email(name: str, email: str, department: Optional[str]
             <p>Reject: <a href="{reject_link}">{reject_link}</a></p>
         </div>
         """
-
+ 
         if not SMTP_HOST or not (EMAIL_FROM or SMTP_USERNAME):
                 print("[Email] SMTP not configured. Would notify:", COMPANY_APPROVER_EMAIL)
                 print("Subject:", subject)
                 print("Body:\n", text)
                 return
-
+ 
         msg = _build_message(subject, COMPANY_APPROVER_EMAIL, html, text)
-
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-                server.starttls()
-                if SMTP_USERNAME and SMTP_PASSWORD:
-                        server.login(SMTP_USERNAME, SMTP_PASSWORD)
-                server.send_message(msg)
+ 
+        _send_message(msg)

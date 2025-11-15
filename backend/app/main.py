@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
-from app.routes import auth, users, shoutouts, comments, reactions, admin
+from app.routes import auth, users, shoutouts, comments, reactions, admin, notifications
 
 Base.metadata.create_all(bind=engine)
 
@@ -23,6 +23,7 @@ app.include_router(shoutouts.router)
 app.include_router(comments.router)
 app.include_router(reactions.router)
 app.include_router(admin.router)
+app.include_router(notifications.router)
 
 # Static file serving for uploaded attachments
 uploads_dir = os.path.join(os.getcwd(), 'uploads')

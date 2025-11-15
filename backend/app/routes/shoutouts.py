@@ -10,6 +10,7 @@ from app.models.comment import Comment
 from app.schemas.shoutout import ShoutOut as ShoutOutSchema, ShoutOutCreate, ShoutOutUpdate
 import os, secrets, shutil
 from app.middleware.auth import get_current_active_user
+from app.utils.notifications import create_notification
 
 router = APIRouter(prefix="/api/shoutouts", tags=["shoutouts"])
 
@@ -90,6 +91,7 @@ async def create_shoutout(
     db.flush()
 
     # Validate recipients
+    recipient_objects = []
     for recipient_id in recipient_ids:
         recipient = db.query(User).filter(User.id == recipient_id).first()
         if not recipient:
@@ -100,6 +102,7 @@ async def create_shoutout(
             raise HTTPException(status_code=403, detail="Can only tag users from your own department")
         shoutout_recipient = ShoutOutRecipient(shoutout_id=new_shoutout.id, recipient_id=recipient_id)
         db.add(shoutout_recipient)
+        recipient_objects.append(recipient)
 
     # Handle file uploads (optional)
     saved_files = []
@@ -130,6 +133,27 @@ async def create_shoutout(
             saved_files.append({"url": url, "name": original_name, "type": mime, "size": size})
         for f in saved_files:
             db.add(ShoutOutAttachment(shoutout_id=new_shoutout.id, url=f["url"], name=f["name"], type=f.get("type"), size=f.get("size")))
+
+    # Notify tagged recipients
+    preview = (message or "").strip()
+    if len(preview) > 160:
+        preview = f"{preview[:157]}..."
+
+    for recipient in recipient_objects:
+        create_notification(
+            db,
+            user_id=recipient.id,
+            actor_id=current_user.id,
+            event_type="shoutout.received",
+            title=f"{current_user.name} recognized you",
+            message=preview,
+            reference_type="shoutout",
+            reference_id=new_shoutout.id,
+            payload={
+                "shoutout_id": new_shoutout.id,
+                "redirect_url": "/feed",
+            },
+        )
 
     db.commit()
     db.refresh(new_shoutout)

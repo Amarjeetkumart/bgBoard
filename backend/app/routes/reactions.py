@@ -7,6 +7,7 @@ from app.models.shoutout import ShoutOut
 from sqlalchemy import func
 from app.schemas.reaction import ReactionCreate, ReactionSummary, ReactionUser
 from app.middleware.auth import get_current_active_user
+from app.utils.notifications import create_notification
 
 router = APIRouter(prefix="/api/shoutouts", tags=["reactions"])
 
@@ -45,10 +46,37 @@ async def add_reaction(
         user_id=current_user.id,
         type=reaction_data.type
     )
-    
+
     db.add(new_reaction)
+    db.flush()
+
+    recipients_to_notify = set()
+    if shoutout.sender_id != current_user.id:
+        recipients_to_notify.add(shoutout.sender_id)
+    for recipient in shoutout.recipients:
+        rid = recipient.recipient_id
+        if rid != current_user.id:
+            recipients_to_notify.add(rid)
+
+    reaction_label = reaction_data.type.capitalize()
+    for uid in recipients_to_notify:
+        create_notification(
+            db,
+            user_id=uid,
+            actor_id=current_user.id,
+            event_type="reaction.new",
+            title=f"{current_user.name} reacted to a shoutout",
+            message=f"Reaction: {reaction_label}",
+            reference_type="shoutout",
+            reference_id=shoutout_id,
+            payload={
+                "shoutout_id": shoutout_id,
+                "redirect_url": "/feed",
+            },
+        )
+
     db.commit()
-    
+
     return {"message": "Reaction added successfully"}
 
 @router.delete("/{shoutout_id}/reactions/{reaction_type}")
@@ -110,7 +138,7 @@ async def list_reactions(
             .order_by(User.name.asc())
             .all()
         )
-    users_map[t] = [ReactionUser(id=u.id, name=u.name, email=u.email, department=u.department, avatar_url=u.avatar_url) for u in rows]
+        users_map[t] = [ReactionUser(id=u.id, name=u.name, email=u.email, department=u.department, avatar_url=u.avatar_url) for u in rows]
 
     # If a specific type was requested, include only that in users but keep counts for all
     if reaction_type is None:

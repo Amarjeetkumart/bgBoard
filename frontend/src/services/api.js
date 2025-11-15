@@ -108,3 +108,10 @@ export const adminAPI = {
   getCommentReports: (status) => api.get('/admin/comment-reports', { params: status ? { status } : undefined }),
   resolveCommentReport: (reportId, action) => api.post(`/admin/comment-reports/${reportId}/resolve`, { action }),
 };
+
+export const notificationsAPI = {
+  list: (params) => api.get('/notifications', { params }),
+  markRead: (ids) => api.post('/notifications/mark-read', ids ? { ids } : {}),
+  markAllRead: () => api.post('/notifications/mark-all-read'),
+  clearAll: () => api.delete('/notifications'),
+};

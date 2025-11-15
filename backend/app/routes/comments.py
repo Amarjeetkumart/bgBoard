@@ -9,6 +9,7 @@ from app.schemas.comment import Comment as CommentSchema, CommentCreate, Comment
 from app.schemas.comment_report import CommentReport as CommentReportSchema, CommentReportCreate
 from app.middleware.auth import get_current_active_user
 from app.models.comment_report import CommentReport as CommentReportModel
+from app.utils.notifications import create_notification
 import re
 from sqlalchemy.orm import joinedload
 
@@ -51,6 +52,75 @@ async def create_comment(
             new_comment.mentions.extend(mentioned_users)
     
     db.add(new_comment)
+    db.flush()
+
+    preview = (comment_data.content or "").strip()
+    if len(preview) > 160:
+        preview = f"{preview[:157]}..."
+
+    # Notify shoutout owner about new comment (excluding self comments)
+    if shoutout.sender_id != current_user.id:
+        create_notification(
+            db,
+            user_id=shoutout.sender_id,
+            actor_id=current_user.id,
+            event_type="comment.new",
+            title=f"{current_user.name} commented on your shoutout",
+            message=preview,
+            reference_type="comment",
+            reference_id=new_comment.id,
+            payload={
+                "shoutout_id": shoutout_id,
+                "comment_id": new_comment.id,
+                "redirect_url": "/feed",
+            },
+        )
+
+    # Notify other recipients tagged on the shoutout
+    notified_recipient_ids = set()
+    for recipient in shoutout.recipients:
+        rid = recipient.recipient_id
+        if rid in (current_user.id, shoutout.sender_id):
+            continue
+        if rid in notified_recipient_ids:
+            continue
+        create_notification(
+            db,
+            user_id=rid,
+            actor_id=current_user.id,
+            event_type="comment.new",
+            title=f"New comment on a shoutout you're tagged in",
+            message=preview,
+            reference_type="comment",
+            reference_id=new_comment.id,
+            payload={
+                "shoutout_id": shoutout_id,
+                "comment_id": new_comment.id,
+                "redirect_url": "/feed",
+            },
+        )
+        notified_recipient_ids.add(rid)
+
+    # Notify mentioned users explicitly
+    for mentioned in mentioned_users:
+        if mentioned.id == current_user.id:
+            continue
+        create_notification(
+            db,
+            user_id=mentioned.id,
+            actor_id=current_user.id,
+            event_type="comment.mention",
+            title=f"{current_user.name} mentioned you in a comment",
+            message=preview,
+            reference_type="comment",
+            reference_id=new_comment.id,
+            payload={
+                "shoutout_id": shoutout_id,
+                "comment_id": new_comment.id,
+                "redirect_url": "/feed",
+            },
+        )
+
     db.commit()
     db.refresh(new_comment)
     return new_comment
