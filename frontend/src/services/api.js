@@ -4,9 +4,6 @@ const API_URL = '/api';
 
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 api.interceptors.request.use((config) => {
@@ -60,7 +57,14 @@ export const userAPI = {
 };
 
 export const shoutoutAPI = {
-  create: (data) => api.post('/shoutouts', data),
+  create: (data) => {
+    if (data instanceof FormData) {
+      return api.post('/shoutouts', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/shoutouts', data);
+  },
   getAll: (params) => api.get('/shoutouts', { params }),
   getOne: (id) => api.get(`/shoutouts/${id}`),
   update: (id, data) => api.put(`/shoutouts/${id}`, data),

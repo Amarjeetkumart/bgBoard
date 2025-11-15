@@ -70,7 +70,7 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow p-6">
+  <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow p-6 card">
       <div className="flex items-start space-x-3 mb-4">
         <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
           {(shoutout.sender?.name?.charAt(0)?.toUpperCase()) || '?'}
@@ -83,6 +83,13 @@ export default function ShoutoutCard({ shoutout, onReaction, onComment, onRefres
             </div>
           </div>
           <p className="text-gray-800 dark:text-gray-100 mt-2">{shoutout.message}</p>
+          {Array.isArray(shoutout.attachments) && shoutout.attachments.length > 0 && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {shoutout.attachments.map((att, idx) => (
+                <AttachmentPreview key={idx} attachment={att} />
+              ))}
+            </div>
+          )}
           <div className="mt-2">
             <p className="text-sm text-gray-600 dark:text-gray-300">
               Tagged: {(shoutout.recipients || []).map(r => r.name).join(', ') || 'None'}
@@ -209,4 +216,22 @@ function renderMentions(text) {
     nodes.push(text.slice(lastIndex));
   }
   return nodes;
+}
+
+function AttachmentPreview({ attachment }) {
+  const url = attachment?.url || attachment;
+  const name = attachment?.name || (typeof attachment === 'string' ? attachment.split('/').pop() : 'file');
+  const isImage = typeof attachment === 'object' ? (attachment.type || '').startsWith('image/') : /\.(png|jpe?g|gif|webp)$/i.test(url || '');
+  if (!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="block group">
+      {isImage ? (
+        <img src={url} alt={name} className="w-full h-40 object-cover rounded border border-gray-200 dark:border-gray-700" />
+      ) : (
+        <div className="h-40 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
+          📄 {name}
+        </div>
+      )}
+    </a>
+  );
 }
